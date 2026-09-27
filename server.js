@@ -7,6 +7,7 @@ const ROOT = __dirname;
 const DATA_FILE = path.join(ROOT, 'data.json');
 const PORT = Number(process.env.PORT || 8001);
 const sessions = new Map();
+const profileCache = new Map();
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.avif': 'image/avif', '.json': 'application/json; charset=utf-8' };
 
 function hash(password, salt = crypto.randomBytes(16).toString('hex')) {
@@ -50,6 +51,46 @@ function auth(req, res, admin = false) {
 }
 async function api(req, res, url) {
   const p = url.pathname;
+  const profileMatch = p.match(/^\/api\/tiktok\/profile\/([^/]+)$/);
+  if (profileMatch && req.method === 'GET') {
+    let username;
+    try { username = decodeURIComponent(profileMatch[1]).replace(/^@+/, '').trim(); }
+    catch { return send(res, 400, { error: 'Invalid TikTok username' }); }
+    if (!/^[a-zA-Z0-9._-]{1,24}$/.test(username)) return send(res, 400, { error: 'Enter a valid TikTok username' });
+    const cacheKey = username.toLowerCase();
+    const cached = profileCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return send(res, 200, { data: cached.profile });
+    try {
+      const response = await fetch('https://www.tikwm.com/api/user/info/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (compatible; TikTokProfileLookup/1.0)',
+        },
+        body: new URLSearchParams({ unique_id: username }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (response.status === 429) return send(res, 429, { error: 'Profile service is busy. Try again in a moment.' });
+      if (!response.ok) return send(res, 502, { error: 'Profile service is temporarily unavailable.' });
+      const result = await response.json();
+      const user = result?.data?.user || result?.user || null;
+      if (result?.code !== 0 || !user) return send(res, 404, { error: 'TikTok profile not found.' });
+      const stats = user.stats || user;
+      const profile = {
+        username: user.uniqueId || user.unique_id || username,
+        nickname: user.nickname || user.displayName || user.display_name || user.uniqueId || username,
+        avatar: user.avatarLarger || user.avatarMedium || user.avatarThumb || user.avatar || '',
+        followers: stats.followerCount ?? stats.follower_count ?? '0',
+        following: stats.followingCount ?? stats.following_count ?? '0',
+        likes: stats.heartCount ?? stats.total_favorited ?? stats.likes_count ?? '0',
+      };
+      profileCache.set(cacheKey, { profile, expiresAt: Date.now() + 10 * 60 * 1000 });
+      return send(res, 200, { data: profile });
+    } catch (error) {
+      const timeout = error?.name === 'TimeoutError' || error?.name === 'AbortError';
+      return send(res, 502, { error: timeout ? 'Profile lookup timed out. Try again.' : 'Could not reach the profile service.' });
+    }
+  }
   if (p === '/api/auth/login' && req.method === 'POST') {
     let input; try { input = await body(req); } catch (e) { return send(res, 400, { error: e.message }); }
     const u = db.users.find(x => x.username.toLowerCase() === String(input.username || '').trim().toLowerCase());

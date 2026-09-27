@@ -193,6 +193,7 @@
           </div>
         </div>
       </div>
+      <div id="profileLookupStatus" class="mx-3 mt-1 hidden text-xs text-gray-400" role="status" aria-live="polite"></div>
 
       <!-- Recharge section with 9 coin grid -->
       <div class="m-2 rounded-lg" style="background: #334155;">
@@ -804,11 +805,15 @@
       // giving up — otherwise the profile intermittently "won't show".
       const url = `/api/tiktok/profile/${encodeURIComponent(clean)}`;
       let response = await fetch(url, { credentials: 'include' });
-      if (!response.ok) {
+      if (!response.ok && response.status !== 429) {
         await new Promise((r) => setTimeout(r, 250));
         response = await fetch(url, { credentials: 'include' });
       }
-      if (!response.ok) return null;
+      if (!response.ok) {
+        let message = 'Could not load this TikTok profile.';
+        try { message = (await response.json()).error || message; } catch { /* ignore */ }
+        throw new Error(message);
+      }
 
       const body = await response.json();
       const data = body?.data || null;
@@ -833,11 +838,17 @@
       clearTimeout(typingTimer);
 
       if (!value) {
+        previewSeq += 1;
         document.getElementById('profilePreview').classList.add('hidden');
+        document.getElementById('profileLookupStatus').classList.add('hidden');
         return;
       }
 
       const seq = ++previewSeq;
+      const status = document.getElementById('profileLookupStatus');
+      status.textContent = 'Looking up TikTok profile…';
+      status.classList.remove('hidden');
+      document.getElementById('profilePreview').classList.add('hidden');
       typingTimer = setTimeout(async () => {
         try {
           const profile = await fetchTikTokProfile(value);
@@ -850,14 +861,17 @@
             document.getElementById('previewName').textContent = profile.name || '';
             document.getElementById('previewStats').textContent = `${profile.followers} Followers | ${profile.following} Following | ${profile.likes} Likes`;
             document.getElementById('profilePreview').classList.remove('hidden');
+            status.classList.add('hidden');
           } else {
             lastPreviewProfile = null;
             document.getElementById('profilePreview').classList.add('hidden');
+            status.textContent = 'TikTok did not return a profile for that username.';
           }
-        } catch {
+        } catch (error) {
           if (seq !== previewSeq) return;
           lastPreviewProfile = null;
           document.getElementById('profilePreview').classList.add('hidden');
+          status.textContent = error?.message || 'Profile lookup failed. Please try again shortly.';
         }
       }, 500);
     }
