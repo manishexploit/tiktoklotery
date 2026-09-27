@@ -1,0 +1,1572 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="TikTok Reward" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Reward</title>
+  <link rel="icon" type="image/png" href="image/tiktokicon.png" />
+  <link rel="apple-touch-icon" href="image/tiktokicon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; background: #0f172a; }
+    .flex-3 { flex: 3; }
+    .live-firework {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 45;
+    }
+    .live-firework.show { display: flex; }
+    .live-firework-core {
+      position: relative;
+      width: min(14vw, 84px);
+      aspect-ratio: 1 / 1;
+      border-radius: 999px;
+      overflow: hidden;
+      border: 2px solid rgba(255, 255, 255, 0.85);
+      box-shadow: 0 0 16px rgba(255, 200, 0, 0.4), 0 0 28px rgba(255, 96, 96, 0.3);
+      animation: liveFireworkFlight 0.58s ease-out forwards;
+      background: rgba(12, 16, 24, 0.96);
+      opacity: 1;
+      transition: opacity 0.2s ease;
+    }
+    .live-firework.center-hidden .live-firework-core { opacity: 0; }
+    .live-firework-avatar,
+    .live-firework-gift {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: opacity 0.2s ease;
+    }
+    .live-firework-gift {
+      opacity: 0;
+      object-fit: contain;
+      padding: 22%;
+    }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes slideFromBottom { from { transform: translate3d(0,100%,0); } to { transform: translate3d(0,0,0); } }
+    @keyframes slideToBottom { from { transform: translate3d(0,0,0); } to { transform: translate3d(0,100%,0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    .order-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; }
+    .order-overlay.show { animation: fadeIn 0.3s ease forwards; }
+    .order-overlay.hiding { animation: fadeOut 0.3s ease forwards; }
+    .order-drawer { position: fixed; inset-inline: 0; bottom: 0; max-height: 80vh; z-index: 1100; background: #fff; border-top-left-radius: 1rem; border-top-right-radius: 1rem; box-shadow: 0 2px 12px 0 rgba(0,0,0,0.12); display: flex; flex-direction: column; }
+    .order-drawer.show { animation: slideFromBottom 0.4s cubic-bezier(0.32,0.72,0,1) forwards; }
+    .order-drawer.hiding { animation: slideToBottom 0.4s cubic-bezier(0.32,0.72,0,1) forwards; }
+    .live-firework-burst {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      object-fit: cover;
+      background: rgba(12, 16, 24, 0.98);
+      border: 2px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 0 14px rgba(255, 220, 120, 0.62);
+      transform: translate(var(--fx, 0), var(--fy, 0)) scale(0);
+      animation: liveBurst 0.56s ease-out forwards;
+      animation-delay: var(--delay, 0ms);
+      opacity: 0;
+    }
+    /* Tap-to-spin zone under the grid + first-open hint */
+    .spin-zone { min-height: 140px; display: flex; border-radius: 0.5rem; -webkit-tap-highlight-color: transparent; }
+    .spin-hint {
+      flex: 1; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+      border: 2px dashed rgba(52, 211, 153, 0.75); background: rgba(16, 185, 129, 0.12); border-radius: 0.5rem;
+      color: #6ee7b7; cursor: pointer; text-align: center; padding: 16px;
+      animation: spinHintPulse 1.6s ease-in-out infinite; transition: opacity 0.3s ease;
+    }
+    .spin-hint.show { display: flex; }
+    .spin-hint.fade { opacity: 0; }
+    @keyframes spinHintPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.35); }
+      50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+    }
+    /* Custom keypad sheet — tiktokwallet layout, Mode 1 slate/emerald palette */
+    .kp-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 60; display: none; }
+    .kp-sheet {
+      position: fixed; left: 50%; bottom: 0; transform: translateX(-50%) translateY(100%);
+      width: min(430px, 100vw); background: #1e293b; border-radius: 20px 20px 0 0;
+      padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); z-index: 70;
+      transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+      box-shadow: 0 -10px 40px rgba(0,0,0,0.4);
+    }
+    .kp-sheet.open { transform: translateX(-50%) translateY(0); }
+    .kp-close { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: none; border: none; color: #94a3b8; cursor: pointer; }
+    .kp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .kp-key {
+      height: 52px; border-radius: 12px; background: #334155; border: none; cursor: pointer;
+      font-size: 22px; font-weight: 600; color: #e2e8f0; display: flex; align-items: center; justify-content: center;
+    }
+    .kp-key:active { background: #475569; }
+    .kp-key-fn { color: #94a3b8; }
+    #kpConfirm:disabled { opacity: 0.45; cursor: not-allowed; }
+    @keyframes liveFireworkFlight {
+      0% { transform: translate(var(--origin-x, 0px), calc(var(--origin-y, 0px) + 120px)) scale(0.28); opacity: 0; }
+      25% { opacity: 1; }
+      100% { transform: translate(var(--origin-x, 0px), calc(var(--origin-y, 0px) - 14px)) scale(0.9); opacity: 1; }
+    }
+    @keyframes liveBurst {
+      0% { transform: translate(var(--origin-x, 0px), var(--origin-y, 0px)) scale(0.1); opacity: 0.95; }
+      100% { transform: translate(calc(var(--origin-x, 0px) + var(--fx, 0px)), calc(var(--origin-y, 0px) + var(--fy, 0px))) scale(1.5); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="flex flex-col h-screen justify-between" style="max-height: -webkit-fill-available; height: 100dvh; background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);">
+
+    <!-- Header -->
+    <header>
+      <div class="flex items-center overflow-hidden relative h-[52px]">
+        <div class="absolute w-full h-full top-0 left-0 -z-[1]" style="background: #1e293b;"></div>
+        <div class="inline-flex items-center justify-start flex-1 h-full"></div>
+        <div class="truncate flex-3 px-4 text-center text-lg font-bold text-white leading-[52px]">Reward</div>
+        <div class="flex-1 inline-flex items-center justify-end h-full">
+          <button id="resetBtn" class="h-10 w-10 p-0 text-white flex items-center justify-center bg-transparent border-none cursor-pointer" title="Reset All">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+          </button>
+          <button class="h-10 w-10 p-0 text-white flex items-center justify-center bg-transparent border-none cursor-pointer">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><path d="M12 17h.01"></path></svg>
+          </button>
+          <button id="logoutBtn" class="h-10 w-10 p-0 text-white flex items-center justify-center bg-transparent border-none cursor-pointer" title="Back to portal">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-log-out w-5 h-5" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="m16 17 5-5-5-5"></path><line x1="12" x2="21" y1="12" y2="12"></line></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main scrollable area -->
+    <main class="pb-16 flex-1 overflow-y-auto flex flex-col">
+
+      <!-- Username input row -->
+      <div id="mode1Header">
+        <div class="flex items-center px-4 mx-2 rounded-lg overflow-hidden transition-all duration-400 h-[80px]" style="background: #334155;">
+          <div id="tiktokIconBtn" class="w-9 h-9 bg-black rounded-full flex items-center justify-center mr-3 cursor-pointer hover:opacity-80 transition-opacity overflow-hidden">
+            <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 24 24"><path fill="#ffffff" d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74a2.89 2.89 0 0 1 2.31-4.64a2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"></path></svg>
+          </div>
+          <input type="file" id="iconUpload" accept="image/*" class="hidden" />
+          <div class="flex-1">
+            <input id="nameInput" class="w-full min-w-0 rounded-md border px-3 py-1 text-base outline-none h-12" style="background: #1e293b; border-color: #475569; color: #e2e8f0;" placeholder="Type" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Mode 2 style header (Recharge + total coins) -->
+      <div id="mode2Header" class="mx-2 hidden">
+        <div class="rounded-lg px-4 py-4" style="background: #334155;">
+          <div class="flex items-center gap-3">
+            <div id="mode2IconBtn" class="w-12 h-12 bg-black rounded-full flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity overflow-hidden flex-shrink-0">
+              <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24"><path fill="#ffffff" d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74a2.89 2.89 0 0 1 2.31-4.64a2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"></path></svg>
+            </div>
+            <div class="flex-1">
+              <div class="text-lg font-semibold text-white">Recharge</div>
+              <div class="flex items-center gap-1 mt-0.5">
+                <svg id="mode2HeaderCoin" width="18" height="18" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="24" fill="#FFB84D"/><circle cx="24" cy="24" r="23" fill="#FFDE55"/><circle cx="24" cy="24" r="18" fill="#F7A80F"/><path d="M34.34 18.18a5.78 5.78 0 0 1-5.82-5.74h-3.87v15.63c0 1.94-1.6 3.5-3.56 3.5a3.53 3.53 0 0 1-3.55-3.5 3.53 3.53 0 0 1 4.52-3.38v-3.9a7.38 7.38 0 0 0-8.4 7.28 7.38 7.38 0 0 0 7.43 7.34c4.1 0 7.43-3.29 7.43-7.34v-7.98a9.73 9.73 0 0 0 5.82 1.92v-3.83Z" fill="white"/></svg>
+                <span id="mode2CoinDisplay" class="text-sm text-gray-500">0</span>
+              </div>
+            </div>
+          </div>
+          <div class="mt-3">
+            <input id="nameInput2" class="w-full min-w-0 rounded-md border px-3 py-1 text-base outline-none h-12" style="background: #1e293b; border-color: #475569; color: #e2e8f0;" placeholder="Type" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Profile preview (auto-shown on typing) -->
+      <div id="profilePreview" class="mx-2 mt-1 hidden">
+        <div class="flex items-center gap-3 rounded-lg px-4 py-3" style="background: #334155;">
+          <img id="previewAvatar" src="image/tiktokicon.png" class="w-12 h-12 rounded-full object-cover bg-gray-100" alt="avatar" />
+          <div class="flex-1 min-w-0">
+            <div id="previewHandle" class="font-bold text-sm text-white"></div>
+            <div id="previewName" class="text-gray-400 text-xs"></div>
+            <div id="previewStats" class="text-gray-400 text-xs mt-0.5"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recharge section with 9 coin grid -->
+      <div class="m-2 rounded-lg" style="background: #334155;">
+        <div class="flex flex-col gap-1 px-4 py-3">
+          <h2 class="text-white text-sm font-medium">Reward</h2>
+          <div class="flex items-center">
+            <strong class="text-emerald-400 text-xs">Claim your reward below!</strong>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 text-gray-500 ml-1"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><path d="M12 17h.01"></path></svg>
+          </div>
+        </div>
+        <div class="h-px" style="background: #475569;"></div>
+        <div class="flow-root px-4 py-4">
+          <ol id="coinGrid" class="grid p-0 gap-2 grid-cols-3 m-0"></ol>
+        </div>
+      </div>
+
+      <!-- Tap-to-spin zone under the grid. The hint box only shows until the first tap. -->
+      <div id="spinZone" class="spin-zone mx-2 mb-2 flex-1" role="button" aria-label="Spin">
+        <div id="spinHint" class="spin-hint">
+          <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 14a8 8 0 0 1-8 8"/><path d="M18 11v-1a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V9a2 2 0 0 0-2-2a2 2 0 0 0-2 2v1"/><path d="M10 9.5V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v10"/><path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+          <div class="text-base font-semibold">Tap here to spin</div>
+          <div class="text-xs" style="color:#94a3b8;">This guide disappears after your first tap</div>
+        </div>
+      </div>
+
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="sticky bottom-0 z-10">
+      <div class="px-4 py-3 shadow-[0_2px_12px_0_rgba(0,0,0,0.3)] transform-gpu pb-5" style="background: #1e293b;">
+        <button id="claimRewardBtn" class="w-full text-white h-11 rounded-lg text-base font-semibold flex items-center justify-center gap-1 border-none cursor-pointer" style="background: linear-gradient(135deg, #10b981, #059669); transition: opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+          <span>Claim Reward</span>
+        </button>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Order Summary Overlay + Drawer -->
+  <div id="orderOverlay" class="order-overlay" style="display:none;"></div>
+  <div id="orderDrawer" class="order-drawer" style="display:none;">
+    <div class="flex items-center overflow-hidden relative h-[52px] bg-white border-b" style="border-top-left-radius:1rem;border-top-right-radius:1rem;">
+      <div class="inline-flex items-center justify-start flex-1 h-full"><button id="orderBackBtn" class="h-10 w-10 p-0 text-black flex items-center justify-center bg-transparent border-none cursor-pointer"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></button></div>
+      <h2 class="truncate flex-3 px-4 text-center text-lg font-bold text-black">Order summary</h2>
+      <div class="flex-1 inline-flex items-center justify-end h-full"><button class="h-10 w-10 p-0 text-black flex items-center justify-center bg-transparent border-none cursor-pointer"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><path d="M12 17h.01"></path></svg></button></div>
+    </div>
+    <div class="flex items-center justify-center px-4 py-2 bg-green-50 border-b border-green-100">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 text-green-600 mr-2"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></svg>
+      <span class="text-sm text-green-600 font-medium">Secure payment</span>
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 text-green-600 ml-1"><path d="m9 18 6-6-6-6"></path></svg>
+    </div>
+    <div class="flex-1 p-4 overflow-auto">
+      <div class="mb-6">
+        <div class="flex items-center justify-between mb-3"><span class="text-sm text-gray-600">Account</span><span id="orderAccount" class="text-sm"></span></div>
+        <div class="flex items-center justify-between mb-3"><span id="orderCoins" class="text-sm font-medium">0 Coins</span><span id="orderPrice" class="text-sm">$0.00</span></div>
+        <div class="border-t border-gray-200 my-4"></div>
+      </div>
+      <div class="mb-6">
+        <h3 class="text-sm font-medium text-gray-600 mb-4">Payment method</h3>
+        <div id="savedCardOption" class="border border-gray-200 rounded-lg mb-3 cursor-pointer transition-all hidden">
+          <div class="flex items-center justify-between p-4">
+            <div class="flex items-center">
+              <div id="savedCardIcon" class="w-6 h-4 bg-gray-100 rounded mr-3"><svg width="24" height="16" viewBox="0 0 24 16" fill="none" class="w-full h-full"><path d="M14.625 11.25C14.4179 11.25 14.25 11.4179 14.25 11.625V12.375C14.25 12.5821 14.4179 12.75 14.625 12.75H17.625C17.8321 12.75 18 12.5821 18 12.375V11.625C18 11.4179 17.8321 11.25 17.625 11.25H14.625Z" fill="black"></path><path fill-rule="evenodd" clip-rule="evenodd" d="M4.5 2.625C3.67157 2.625 3 3.29657 3 4.125V13.875C3 14.7034 3.67157 15.375 4.5 15.375H19.5C20.3284 15.375 21 14.7034 21 13.875V4.125C21 3.29657 20.3284 2.625 19.5 2.625H4.5ZM4.5 4.125H19.5V5.8125H4.5V4.125ZM4.5 7.3125H19.5V13.875H4.5V7.3125Z" fill="black"></path></svg></div>
+              <span id="savedCardText" class="text-sm">Visa •••• 1234</span>
+            </div>
+            <div class="flex items-center"><input id="savedCardRadio" class="w-4 h-4 text-red-500" type="radio" value="saved-card" name="payment" /></div>
+          </div>
+        </div>
+        <div id="newCardOption" class="border border-gray-200 rounded-lg mb-3 cursor-pointer transition-all">
+          <div class="flex items-center justify-between p-4">
+            <div class="flex items-center">
+              <div class="w-6 h-4 bg-gray-100 rounded mr-3"><svg width="24" height="16" viewBox="0 0 24 16" fill="none" class="w-full h-full"><path d="M14.625 11.25C14.4179 11.25 14.25 11.4179 14.25 11.625V12.375C14.25 12.5821 14.4179 12.75 14.625 12.75H17.625C17.8321 12.75 18 12.5821 18 12.375V11.625C18 11.4179 17.8321 11.25 17.625 11.25H14.625Z" fill="black"></path><path fill-rule="evenodd" clip-rule="evenodd" d="M4.5 2.625C3.67157 2.625 3 3.29657 3 4.125V13.875C3 14.7034 3.67157 15.375 4.5 15.375H19.5C20.3284 15.375 21 14.7034 21 13.875V4.125C21 3.29657 20.3284 2.625 19.5 2.625H4.5ZM4.5 4.125H19.5V5.8125H4.5V4.125ZM4.5 7.3125H19.5V13.875H4.5V7.3125Z" fill="black"></path></svg></div>
+              <span class="text-sm">Add Credit Or Debit Card</span>
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-gray-400"><path d="m9 18 6-6-6-6"></path></svg>
+          </div>
+          <div id="cardForm" class="px-4 pb-4 space-y-3 hidden">
+            <div><label class="block text-xs text-gray-600 mb-1">Card number</label><input type="text" id="cardNumber" class="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="1234 5678 9012 3456" maxlength="19" /></div>
+            <div class="flex gap-3"><div class="flex-1"><label class="block text-xs text-gray-600 mb-1">Expiry date</label><input type="text" id="cardExpiry" class="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="MM/YY" maxlength="5" /></div><div class="flex-1"><label class="block text-xs text-gray-600 mb-1">CVV</label><input type="text" id="cardCVV" class="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="123" maxlength="4" /></div></div>
+            <div><label class="block text-xs text-gray-600 mb-1">Cardholder name</label><input type="text" id="cardName" class="w-full border border-gray-300 rounded px-3 py-2 text-sm" placeholder="John Doe" /></div>
+            <button id="saveCardBtn" class="w-full mt-3 bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded text-sm font-medium border-none cursor-pointer">Save Card</button>
+          </div>
+        </div>
+        <div id="applePayOption" class="border border-gray-200 rounded-lg cursor-pointer transition-all">
+          <div class="flex items-center justify-between p-4">
+            <div class="flex items-center">
+              <div class="w-6 h-4 bg-black rounded mr-3 flex items-center justify-center"><svg width="16" height="7" viewBox="0 0 16 7" fill="white"><path d="M3.89 0C3.28 0 2.78 0.5 2.78 1.11C2.78 1.72 3.28 2.22 3.89 2.22C4.5 2.22 5 1.72 5 1.11C5 0.5 4.5 0 3.89 0ZM1.67 2.78C0.75 2.78 0 3.53 0 4.44C0 5.36 0.75 6.11 1.67 6.11C2.58 6.11 3.33 5.36 3.33 4.44C3.33 3.53 2.58 2.78 1.67 2.78Z"></path></svg></div>
+              <span class="text-sm">Apple Pay</span>
+            </div>
+            <div class="flex items-center"><input id="applePayRadio" class="w-4 h-4 text-red-500" type="radio" value="apple-pay" name="payment" /></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="bg-gray-50 p-4 shadow-[0_-2px_12px_0_rgba(0,0,0,0.12)]">
+      <div class="mb-4">
+        <div class="relative flex justify-between items-center">
+          <div class="text-xs text-gray-600 leading-relaxed overflow-hidden" style="line-height:1.2em;max-height:2.4em;"><p class="mb-2">By tapping <span class="font-semibold text-black">Pay</span> to make a purchase, you acknowledge that you are purchasing a limited license to access this virtual item subject to our <a href="#" class="text-black font-semibold underline">Virtual Items Policy</a>.</p></div>
+        </div>
+      </div>
+      <div class="flex items-center justify-between mb-3"><span class="text-lg font-bold">Total</span><span id="orderTotal" class="text-lg font-bold">$0.00</span></div>
+      <button id="payNowBtn" class="w-full bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white h-12 rounded-lg text-base font-semibold flex items-center justify-center gap-1 border-none cursor-pointer">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 mr-2"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></svg>
+        <span id="payNowBtnText">Pay now</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Payment Processing Modal -->
+  <div id="paymentProcessingModal" class="fixed inset-0 flex items-center justify-center" style="z-index:10001;background-color:rgba(0,0,0,0.2);display:none;">
+    <div class="bg-white rounded-3xl p-12 w-full max-w-sm mx-4 text-center shadow-2xl" style="border-radius:24px;transform:scaleX(1.08) scaleY(1.2);">
+      <div style="transform:scaleX(0.926) scaleY(0.833);">
+        <div class="flex justify-center mb-6"><img src="image/TikTok%20Recharge_files/red_circle_arc_7px_80percent.png" alt="Processing" class="w-24 h-24" style="animation:spin 1s linear infinite;" /></div>
+        <div class="mb-2"><p class="text-xl font-bold text-black" style="font-size:18px;font-weight:700;">Processing your payment</p></div>
+        <div class="mb-6"><p class="text-sm text-gray-500" style="font-size:14px;font-weight:400;">This could take a few seconds</p></div>
+        <div><p id="paymentCountdown" class="text-lg text-gray-500" style="font-size:18px;font-weight:400;">05:00</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Success Screen -->
+  <div id="successScreen" class="fixed inset-0 flex items-center justify-center p-4" style="z-index:10002;background-color:#f9fafb;display:none;">
+    <div class="p-8 text-center max-w-sm w-full">
+      <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4"><svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg></div>
+      <h2 class="text-xl font-semibold text-gray-800 mb-2">Reward Claimed!</h2>
+      <p id="successMsg" class="text-gray-600 text-sm mb-4"></p>
+      <p class="text-gray-600 text-sm mb-20">This operation has been completed. It will be processed within 24 hours!</p>
+      <button id="successGoBack" class="bg-red-500 hover:bg-red-600 text-white h-16 w-40 rounded-md text-sm font-medium border-none cursor-pointer">Go back</button>
+    </div>
+  </div>
+
+  <!-- Custom amount keypad sheet -->
+  <div class="kp-overlay" id="kpOverlay"></div>
+  <div class="kp-sheet" id="kpSheet">
+    <div class="flex justify-between items-center mb-4">
+      <span style="width:24px"></span>
+      <div class="font-bold text-lg text-white">Custom</div>
+      <button class="kp-close" id="kpClose" aria-label="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+    <div class="text-sm font-semibold text-gray-300 mb-3">Number of Coins</div>
+    <div class="flex items-center gap-2 pb-3 mb-2" style="border-bottom:1px solid #475569;">
+      <span id="kpCoin" class="flex"></span>
+      <span class="text-3xl font-black text-white" id="kpValue">0</span>
+    </div>
+    <div class="text-sm text-gray-400 mb-4" id="kpApprox">≈ US$0.00</div>
+    <div class="kp-grid" id="kpGrid">
+      <button class="kp-key" data-key="1">1</button>
+      <button class="kp-key" data-key="2">2</button>
+      <button class="kp-key" data-key="3">3</button>
+      <button class="kp-key kp-key-fn" data-key="back" aria-label="Backspace">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>
+      </button>
+      <button class="kp-key" data-key="4">4</button>
+      <button class="kp-key" data-key="5">5</button>
+      <button class="kp-key" data-key="6">6</button>
+      <button class="kp-key" data-key="000">000</button>
+      <button class="kp-key" data-key="7">7</button>
+      <button class="kp-key" data-key="8">8</button>
+      <button class="kp-key" data-key="9">9</button>
+      <button class="kp-key" data-key="0">0</button>
+    </div>
+    <div class="flex justify-between items-center mt-4 mb-4">
+      <span class="text-sm text-gray-400">Total</span>
+      <span class="font-black text-white" id="kpTotal">≈ US$0.00</span>
+    </div>
+    <button id="kpConfirm" class="w-full text-white h-12 rounded-lg text-base font-semibold border-none cursor-pointer" style="background:linear-gradient(135deg,#10b981,#059669);">Claim Reward</button>
+  </div>
+
+  <div id="liveFirework" class="live-firework" aria-hidden="true"></div>
+  <canvas id="mode1Fireworks" style="position:fixed;inset:0;pointer-events:none;z-index:40;"></canvas>
+  <div id="winnerPopup" class="hidden fixed inset-0 z-50 bg-black/45 items-center justify-center px-4">
+    <div id="winnerPopupCard" class="bg-white rounded-2xl p-5 w-full max-w-sm text-center shadow-2xl">
+      <div class="text-2xl font-extrabold text-red-500">Congrats!</div>
+      <div class="text-sm text-gray-500 mt-1">Tap anywhere to close</div>
+      <img id="winnerAvatar" src="image/tiktokicon.png" alt="winner avatar" class="w-20 h-20 rounded-full object-cover bg-gray-100 mx-auto mt-4" />
+      <div id="winnerHandle" class="text-sm font-bold text-black mt-3"></div>
+      <div id="winnerDisplayName" class="text-gray-600 text-sm"></div>
+      <div class="mt-4 inline-flex items-center gap-2 text-red-500 text-2xl font-extrabold">
+        <span id="winnerCoinIcon"></span>
+        <span id="winnerCoinAmount">0</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'ttclaimreward-state-v1';
+    const CLIENT_ID = Math.random().toString(36).slice(2);
+    const LOGO_FALLBACK = 'image/tiktokicon.png';
+    const MIN_GRID_SIZE = 2;
+    const MAX_GRID_SIZE = 10;
+    // Default coin rewards; the last seat is always the Custom (keypad) seat.
+    const DEFAULT_PRIZES = [1000, 2000, 5000, 8000, 10000];
+
+    const COIN_SVG = '<svg width="16" height="16" viewBox="0 0 48 48" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#Icon_Color-Tiktok_Coin_svg__a)"><path d="M48 24a24 24 0 1 1-48 0 24 24 0 0 1 48 0Z" fill="#FFB84D"></path><path d="M47 24a23 23 0 1 1-46 0 23 23 0 0 1 46 0Z" fill="#FFDE55"></path><path d="M42 24a18 18 0 1 0-36 0 18 18 0 0 1 36 0Z" fill="#F7A300"></path><path d="M42 24a18 18 0 1 0-36 0 18 18 0 0 1 36 0Z" fill="#F7A80F"></path><path d="M41.94 25.5a18 18 0 1 0-35.88 0 18 18 0 0 1 35.88 0Z" fill="#E88B00"></path><path d="M41.94 25.5a18 18 0 1 0-35.88 0 18 18 0 0 1 35.88 0Z" fill="#F09207"></path><path d="M34.74 17.77v5.86c-2.06 0-4.05-.44-5.81-1.55v7.2a7.79 7.79 0 0 1-7.84 7.75 7.79 7.79 0 0 1-7.8-8.35 7.79 7.79 0 0 1 9.19-8.24v6c-.47-.13-.9-.26-1.39-.26a3.14 3.14 0 0 0-3.09 2.5 3.14 3.14 0 0 0 3.1 2.5c1.74 0 3.14-1.4 3.14-3.11V12.03h4.69a5.6 5.6 0 0 0 5.81 5.74Z" fill="#F09207"></path><path d="M34.34 18.18a5.78 5.78 0 0 1-5.82-5.74h-3.87v15.63c0 1.94-1.6 3.5-3.56 3.5a3.53 3.53 0 0 1-3.55-3.5 3.53 3.53 0 0 1 4.52-3.38v-3.9a7.38 7.38 0 0 0-8.4 7.28 7.38 7.38 0 0 0 7.43 7.34c4.1 0 7.43-3.29 7.43-7.34v-7.98a9.73 9.73 0 0 0 5.82 1.92v-3.83Z" fill="#fff"></path></g><defs><clipPath id="Icon_Color-Tiktok_Coin_svg__a"><path fill="#fff" d="M0 0h48v48H0z"></path></clipPath></defs></svg>';
+
+    let displayMode = localStorage.getItem('tiktok_display_mode') || 'mode-2';
+    let totalCoins = Number(localStorage.getItem('tiktok_total_coins')) || 0;
+    let roomId = 'public';
+    let ws = null;
+    let reconnectTimer = null;
+    let authWatchTimer = null;
+    let typingTimer = null;
+    let previewSeq = 0;
+    let selectedPackIndex = 0;
+    let gridRows = 2;
+    let gridCols = 3;
+    // Coin/currency display settings — synced from Mode 2.
+    let coinSettings = { rate: 0.0104, symbol: 'US$', showCoin: true, coinSize: 36, headerUnit: 'coin' };
+    function applyCoinSettings(c) {
+      if (!c || typeof c !== 'object') return;
+      coinSettings = {
+        rate: Number(c.rate) > 0 ? Number(c.rate) : coinSettings.rate,
+        symbol: typeof c.symbol === 'string' ? c.symbol : coinSettings.symbol,
+        showCoin: c.showCoin !== false,
+        coinSize: Number(c.coinSize) > 0 ? Number(c.coinSize) : coinSettings.coinSize,
+        headerUnit: c.headerUnit === 'currency' ? 'currency' : 'coin',
+      };
+    }
+    function coinIconHtml(size) {
+      return COIN_SVG.replace('width="16" height="16"', `width="${size}" height="${size}"`);
+    }
+    let spinTimer = null;
+    let isSpinAnimating = false;
+    let lastAnimatedWinnerKey = '';
+    let popupVisible = false;
+    let lastPreviewProfile = null;
+    let liveFireworkTimer = null;
+    const liveFireworkTiming = {
+      flightMs: 900,
+      burstMs: 820,
+      firstBurstDelayMs: 950,
+      waveGapMs: 420,
+      cleanupDelayMs: 3400,
+    };
+    const liveFireworkQueue = [];
+    let liveFireworkActive = false;
+    let liveFireworkWindowStart = 0;
+    let liveFireworkAcceptedInWindow = 0;
+    const liveFireworkMaxPerSecond = 3;
+    const liveFireworkMaxQueue = 4;
+    const profileCache = new Map();
+    const liveFirework = document.getElementById('liveFirework');
+    const fireworksCanvas = document.getElementById('mode1Fireworks');
+    const fireworksCtx = fireworksCanvas.getContext('2d');
+    const fireworksParticles = [];
+    let fireworksRafId = null;
+
+    const state = loadState();
+
+    /* ── State helpers ─────────────────────────── */
+
+    function defaultState() {
+      return {
+        participants: [],
+        seatMap: Array(getGridSeatCount()).fill(null),
+        prizes: normalizeArray(DEFAULT_PRIZES.slice(0, getGridSeatCount()), 100, getGridSeatCount()),
+        gridRows,
+        gridCols,
+        winner: null,
+      };
+    }
+
+    function clampGridSize(value, fallback = 3) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.min(MAX_GRID_SIZE, Math.max(MIN_GRID_SIZE, Math.floor(n)));
+    }
+
+    function getGridSeatCount() {
+      return gridRows * gridCols;
+    }
+
+    function normalizeArray(arr, fallbackValue, minSize = 0) {
+      const out = Array.isArray(arr) ? arr.slice() : [];
+      const target = Math.max(minSize, out.length);
+      for (let i = 0; i < target; i += 1) {
+        if (typeof out[i] === 'undefined') out[i] = fallbackValue;
+      }
+      return out;
+    }
+
+    function ensureGridCapacity() {
+      const seatCount = getGridSeatCount();
+      state.seatMap = normalizeArray(state.seatMap, null, seatCount);
+      state.prizes = normalizeArray(state.prizes, 100, seatCount);
+      if (selectedPackIndex >= seatCount) selectedPackIndex = Math.max(0, seatCount - 1);
+      if (state.winner && Number(state.winner.seatIndex) >= seatCount) {
+        state.winner = null;
+      }
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return defaultState();
+        const parsed = JSON.parse(raw);
+        gridRows = clampGridSize(parsed.gridRows, gridRows);
+        gridCols = clampGridSize(parsed.gridCols, gridCols);
+        return {
+          participants: Array.isArray(parsed.participants) ? parsed.participants : [],
+          seatMap: normalizeArray(parsed.seatMap, null, getGridSeatCount()),
+          prizes: normalizeArray(parsed.prizes, 100, getGridSeatCount()),
+          gridRows,
+          gridCols,
+          winner: parsed.winner || null,
+        };
+      } catch {
+        return defaultState();
+      }
+    }
+
+    function persistState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function sanitizeRoom(raw) {
+      return String(raw || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    }
+
+
+
+    async function loadGridStateFromServer() {
+      try {
+        const response = await fetch(`/api/layout?key=${encodeURIComponent(roomId + '-grid-state')}`, { credentials: 'include' });
+        const data = await response.json();
+        if (data.ok && data.style && typeof data.style === 'object') {
+          const s = data.style;
+          gridRows = clampGridSize(s.gridRows, gridRows);
+          gridCols = clampGridSize(s.gridCols, gridCols);
+          state.gridRows = gridRows;
+          state.gridCols = gridCols;
+          if (Array.isArray(s.prizes)) {
+            state.prizes = normalizeArray(s.prizes, 100, getGridSeatCount());
+          }
+          if (Array.isArray(s.participants)) {
+            state.participants = s.participants;
+          }
+          if (Array.isArray(s.seatMap)) {
+            state.seatMap = normalizeArray(s.seatMap, null, getGridSeatCount());
+          }
+          if (s.displayMode) {
+            displayMode = s.displayMode;
+            localStorage.setItem('tiktok_display_mode', displayMode);
+          }
+          if (typeof s.totalCoins === 'number') {
+            totalCoins = s.totalCoins;
+            localStorage.setItem('tiktok_total_coins', String(totalCoins));
+          }
+          applyCoinSettings(s.coinSettings);
+          ensureGridCapacity();
+        }
+      } catch { /* ignore */ }
+    }
+
+    async function saveGridStateToServer() {
+      try {
+        await fetch('/api/layout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            key: roomId + '-grid-state',
+            style: {
+              gridRows,
+              gridCols,
+              prizes: state.prizes,
+              participants: state.participants,
+              seatMap: state.seatMap,
+              displayMode,
+              totalCoins,
+            },
+          }),
+        });
+      } catch { /* ignore */ }
+    }
+
+    function sendState() {
+      const payload = { type: 'claim-state-update', source: CLIENT_ID, state: { ...state, displayMode, totalCoins } };
+      if (ws && ws.readyState === 1) ws.send(JSON.stringify(payload));
+      persistState();
+      saveGridStateToServer();
+    }
+
+    function mergeState(incoming) {
+      if (!incoming || typeof incoming !== 'object') return;
+      gridRows = clampGridSize(incoming.gridRows, gridRows);
+      gridCols = clampGridSize(incoming.gridCols, gridCols);
+      state.gridRows = gridRows;
+      state.gridCols = gridCols;
+      state.participants = Array.isArray(incoming.participants) ? incoming.participants : state.participants;
+      state.seatMap = normalizeArray(incoming.seatMap, null, getGridSeatCount());
+      state.prizes = normalizeArray(incoming.prizes, 100, getGridSeatCount());
+      state.winner = incoming.winner || null;
+      applyCoinSettings(incoming.coinSettings);
+      if (incoming.displayMode) {
+        displayMode = incoming.displayMode;
+        localStorage.setItem('tiktok_display_mode', displayMode);
+      }
+      if (typeof incoming.totalCoins === 'number') {
+        totalCoins = incoming.totalCoins;
+        localStorage.setItem('tiktok_total_coins', String(totalCoins));
+      }
+      ensureGridCapacity();
+      applyDisplayMode();
+    }
+
+    /* ── WebSocket ──────────────────────────────── */
+
+    function connectSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      ws = new WebSocket(`${protocol}://${window.location.host}/ws?room=${encodeURIComponent(roomId)}&client=mode1`);
+      ws.onopen = () => {
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
+        sendState();
+      };
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (!msg || msg.source === CLIENT_ID) return;
+
+          if (msg.type === 'claim-state-update') {
+            const prevWinner = state.winner;
+            mergeState(msg.state);
+            maybeAnimateWinner(prevWinner, state.winner);
+            persistState();
+            render();
+            return;
+          }
+
+          if (msg.type === 'tiktok-live-gift') {
+            const donorAvatar = msg?.donor?.avatar || LOGO_FALLBACK;
+            const giftIcon = msg?.gift?.icon || LOGO_FALLBACK;
+            enqueueLiveGiftFirework(donorAvatar, giftIcon);
+            return;
+          }
+
+          if (msg.type === 'tiktok-live-status') {
+            if (msg.connected) {
+              enqueueLiveGiftFirework(LOGO_FALLBACK, LOGO_FALLBACK);
+            }
+          }
+        } catch { /* ignore */ }
+      };
+      ws.onclose = (event) => {
+        if (event && (event.code === 4401 || event.code === 4403 || event.code === 4409)) {
+          window.location.href = 'portal.html';
+          return;
+        }
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(() => {
+          connectSocket();
+        }, 1500);
+      };
+    }
+
+    function showLiveGiftFirework(donorAvatar, giftIcon) {
+      if (!liveFirework) return;
+      const avatarSrc = donorAvatar || LOGO_FALLBACK;
+      const giftSrc = giftIcon || LOGO_FALLBACK;
+      const timing = liveFireworkTiming;
+      const originX = Math.round((Math.random() - 0.5) * 180);
+      const originY = Math.round((Math.random() - 0.5) * 110);
+      liveFirework.classList.remove('show', 'center-hidden');
+      liveFirework.innerHTML = '';
+      liveFirework.style.setProperty('--origin-x', `${originX}px`);
+      liveFirework.style.setProperty('--origin-y', `${originY}px`);
+
+      const core = document.createElement('div');
+      core.className = 'live-firework-core';
+      const avatar = document.createElement('img');
+      avatar.className = 'live-firework-avatar';
+      avatar.src = avatarSrc;
+      avatar.alt = 'Donor';
+      const gift = document.createElement('img');
+      gift.className = 'live-firework-gift';
+      gift.src = giftSrc;
+      gift.alt = 'Gift';
+      core.append(avatar, gift);
+      core.style.animationDuration = `${timing.flightMs}ms`;
+      liveFirework.appendChild(core);
+
+      const burstOffsets = [
+        [110, 0], [-110, 0], [0, 110], [0, -110],
+        [78, 78], [78, -78], [-78, 78], [-78, -78],
+      ];
+
+      const waves = [
+        { delay: timing.firstBurstDelayMs, mult: 0.72 },
+        { delay: timing.firstBurstDelayMs + timing.waveGapMs, mult: 0.92 },
+        { delay: timing.firstBurstDelayMs + timing.waveGapMs * 2, mult: 1.12 },
+      ];
+      waves.forEach((wave, waveIdx) => {
+        const particleSrc = waveIdx % 2 === 0 ? giftSrc : avatarSrc;
+        const angleJitter = (Math.random() * 360) * (Math.PI / 180);
+        const cosA = Math.cos(angleJitter);
+        const sinA = Math.sin(angleJitter);
+        burstOffsets.forEach(([x, y], idx) => {
+          const b = document.createElement('img');
+          b.className = 'live-firework-burst';
+          b.src = particleSrc;
+          b.alt = '';
+          const rx = x * cosA - y * sinA;
+          const ry = x * sinA + y * cosA;
+          b.style.setProperty('--fx', `${Math.round(rx * wave.mult)}px`);
+          b.style.setProperty('--fy', `${Math.round(ry * wave.mult)}px`);
+          b.style.setProperty('--delay', `${wave.delay + (idx % 2) * 20}ms`);
+          b.style.animationDuration = `${timing.burstMs}ms`;
+          liveFirework.appendChild(b);
+        });
+      });
+
+      liveFirework.classList.add('show');
+      setTimeout(() => {
+        liveFirework.classList.add('center-hidden');
+      }, Math.max(0, timing.firstBurstDelayMs - 80));
+
+      liveFireworkTimer = setTimeout(() => {
+        liveFirework.classList.remove('show', 'center-hidden');
+        liveFirework.innerHTML = '';
+        liveFireworkActive = false;
+        runNextLiveFirework();
+      }, timing.cleanupDelayMs);
+    }
+
+    function runNextLiveFirework() {
+      if (liveFireworkActive) return;
+      const next = liveFireworkQueue.shift();
+      if (!next) return;
+      liveFireworkActive = true;
+      showLiveGiftFirework(next.donorAvatar, next.giftIcon);
+    }
+
+    function enqueueLiveGiftFirework(donorAvatar, giftIcon) {
+      const now = Date.now();
+      if (!liveFireworkWindowStart || now - liveFireworkWindowStart >= 1000) {
+        liveFireworkWindowStart = now;
+        liveFireworkAcceptedInWindow = 0;
+      }
+      if (liveFireworkAcceptedInWindow >= liveFireworkMaxPerSecond) return;
+      liveFireworkAcceptedInWindow += 1;
+
+      if (liveFireworkQueue.length >= liveFireworkMaxQueue) {
+        liveFireworkQueue.shift();
+      }
+      liveFireworkQueue.push({ donorAvatar, giftIcon });
+      runNextLiveFirework();
+    }
+
+    /* ── Auth ───────────────────────────────────── */
+
+    async function requireAuth() {
+      try {
+        const response = await fetch('/api/auth/status', { credentials: 'include' });
+        const data = await response.json();
+        if (!response.ok || !data.authenticated || !data.user) {
+          window.location.href = 'portal.html';
+          return false;
+        }
+        roomId = sanitizeRoom(data.user.username) || 'public';
+        await loadGridStateFromServer();
+        connectSocket();
+        return true;
+      } catch {
+        window.location.href = 'portal.html';
+        return false;
+      }
+    }
+
+    async function checkAuthAlive() {
+      try {
+        const response = await fetch('/api/auth/status', { credentials: 'include' });
+        const data = await response.json();
+        if (!response.ok || !data.authenticated) {
+          if (authWatchTimer) {
+            clearInterval(authWatchTimer);
+            authWatchTimer = null;
+          }
+          try { if (ws) ws.close(); } catch {}
+          window.location.href = 'portal.html';
+        }
+      } catch {
+        // keep current page state on transient network errors
+      }
+    }
+
+    function startAuthWatcher() {
+      if (authWatchTimer) clearInterval(authWatchTimer);
+      authWatchTimer = setInterval(checkAuthAlive, 10000);
+    }
+
+    /* ── TikTok profile fetch ──────────────────── */
+
+    function normalizeHandle(raw) {
+      return String(raw || '').trim().replace(/^@+/, '').replace(/\s+/g, '');
+    }
+
+    async function fetchTikTokProfile(rawInput) {
+      const clean = normalizeHandle(rawInput);
+      if (!clean) return null;
+      if (profileCache.has(clean)) return profileCache.get(clean);
+
+      // Retry once for flaky networks / transient TikTok rate-limits before
+      // giving up — otherwise the profile intermittently "won't show".
+      const url = `/api/tiktok/profile/${encodeURIComponent(clean)}`;
+      let response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) {
+        await new Promise((r) => setTimeout(r, 250));
+        response = await fetch(url, { credentials: 'include' });
+      }
+      if (!response.ok) return null;
+
+      const body = await response.json();
+      const data = body?.data || null;
+      if (!data) return null;
+
+      const profile = {
+        handle: data.username ? `@${normalizeHandle(data.username)}` : `@${clean}`,
+        name: data.nickname || data.username || clean,
+        avatar: data.avatar || LOGO_FALLBACK,
+        followers: data.followers || '0',
+        following: data.following || '0',
+        likes: data.likes || '0',
+      };
+      profileCache.set(clean, profile);
+      return profile;
+    }
+
+    /* ── Auto-preview on typing ────────────────── */
+
+    function autoPreview() {
+      const value = document.getElementById('nameInput').value.trim();
+      clearTimeout(typingTimer);
+
+      if (!value) {
+        document.getElementById('profilePreview').classList.add('hidden');
+        return;
+      }
+
+      const seq = ++previewSeq;
+      typingTimer = setTimeout(async () => {
+        try {
+          const profile = await fetchTikTokProfile(value);
+          // Ignore this response if a newer lookup has started meanwhile.
+          if (seq !== previewSeq) return;
+          if (profile) {
+            lastPreviewProfile = profile;
+            document.getElementById('previewAvatar').src = profile.avatar || LOGO_FALLBACK;
+            document.getElementById('previewHandle').textContent = profile.handle || '';
+            document.getElementById('previewName').textContent = profile.name || '';
+            document.getElementById('previewStats').textContent = `${profile.followers} Followers | ${profile.following} Following | ${profile.likes} Likes`;
+            document.getElementById('profilePreview').classList.remove('hidden');
+          } else {
+            lastPreviewProfile = null;
+            document.getElementById('profilePreview').classList.add('hidden');
+          }
+        } catch {
+          if (seq !== previewSeq) return;
+          lastPreviewProfile = null;
+          document.getElementById('profilePreview').classList.add('hidden');
+        }
+      }, 500);
+    }
+
+    /* ── Coin grid ─────────────────────────────── */
+
+    function selectPack(index) {
+      if (isSpinAnimating) return;
+      selectedPackIndex = index;
+      renderCoinGrid();
+      updateBuyButton();
+    }
+
+    function winnerKey(winner) {
+      if (!winner || typeof winner !== 'object') return '';
+      if (winner.ts) return String(winner.ts);
+      return `${winner.seatIndex}-${winner.profileId || ''}-${winner.amount || 0}`;
+    }
+
+    function startSpinFocusAnimation(targetIndex, key) {
+      const seatCount = getGridSeatCount();
+      const winnerIndex = Number(targetIndex);
+      if (!Number.isInteger(winnerIndex) || winnerIndex < 0 || winnerIndex >= seatCount) return;
+
+      if (spinTimer) {
+        clearTimeout(spinTimer);
+        spinTimer = null;
+      }
+
+      isSpinAnimating = true;
+      let step = 0;
+      const startIndex = selectedPackIndex;
+      const stepsToWinner = (winnerIndex - startIndex + seatCount) % seatCount;
+      const extraLoops = 2 + Math.floor(Math.random() * 3);
+      let totalSteps = extraLoops * seatCount + stepsToWinner;
+      if (totalSteps < seatCount * 2) totalSteps += seatCount;
+
+      function tick() {
+        step += 1;
+        selectedPackIndex = (selectedPackIndex + 1) % seatCount;
+        renderCoinGrid();
+        updateBuyButton();
+
+        if (step >= totalSteps) {
+          clearTimeout(spinTimer);
+          spinTimer = null;
+          selectedPackIndex = winnerIndex;
+          isSpinAnimating = false;
+          lastAnimatedWinnerKey = key;
+          render();
+          if (winnerIndex === customSeatIndex()) openKeypad(true);
+          else celebrateWinnerIfEligible(state.winner);
+          return;
+        }
+
+        const progress = step / totalSteps;
+        const delay = progress < 0.55
+          ? 45
+          : Math.round(45 + ((progress - 0.55) / 0.45) * 170);
+        spinTimer = setTimeout(tick, delay);
+      }
+
+      tick();
+    }
+
+    // Host-triggered spin: from the Claim Reward button or the zone under the grid.
+    function hostSpin() {
+      if (isSpinAnimating) return;
+      const seatCount = getGridSeatCount();
+      const seatIndex = (window.crypto && window.crypto.getRandomValues)
+        ? crypto.getRandomValues(new Uint32Array(1))[0] % seatCount
+        : Math.floor(Math.random() * seatCount);
+      const profile = findProfileById(state.seatMap[seatIndex]);
+      const amount = Number(state.prizes[seatIndex] || 0);
+      state.winner = { seatIndex, profileId: state.seatMap[seatIndex], name: profile ? profile.name : '', amount, ts: Date.now() };
+      sendState();
+      startSpinFocusAnimation(seatIndex, winnerKey(state.winner));
+    }
+
+    const SPIN_HINT_KEY = 'lottery_spin_hint_seen';
+
+    function initSpinZone() {
+      const hint = document.getElementById('spinHint');
+      let seen = false;
+      try { seen = localStorage.getItem(SPIN_HINT_KEY) === '1'; } catch { /* ignore */ }
+      if (!seen) hint.classList.add('show');
+
+      document.getElementById('spinZone').addEventListener('click', () => {
+        if (hint.classList.contains('show')) {
+          try { localStorage.setItem(SPIN_HINT_KEY, '1'); } catch { /* ignore */ }
+          hint.classList.add('fade');
+          setTimeout(() => hint.classList.remove('show', 'fade'), 300);
+        }
+        hostSpin();
+      });
+    }
+
+    function maybeAnimateWinner(prevWinner, nextWinner) {
+      if (!nextWinner || typeof nextWinner !== 'object') return;
+      const seatIndex = Number(nextWinner.seatIndex);
+      if (!Number.isInteger(seatIndex) || seatIndex < 0 || seatIndex >= getGridSeatCount()) return;
+
+      const prevKey = winnerKey(prevWinner);
+      const nextKey = winnerKey(nextWinner);
+      if (!nextKey || nextKey === prevKey || nextKey === lastAnimatedWinnerKey) return;
+
+      startSpinFocusAnimation(nextWinner.seatIndex, nextKey);
+    }
+
+    function findProfileById(profileId) {
+      if (!profileId) return null;
+      return state.participants.find((p) => p.id === profileId) || null;
+    }
+
+    function resizeFireworksCanvas() {
+      fireworksCanvas.width = window.innerWidth;
+      fireworksCanvas.height = window.innerHeight;
+    }
+
+    function animateFireworks() {
+      fireworksRafId = requestAnimationFrame(animateFireworks);
+      fireworksCtx.clearRect(0, 0, fireworksCanvas.width, fireworksCanvas.height);
+
+      for (let i = fireworksParticles.length - 1; i >= 0; i -= 1) {
+        const p = fireworksParticles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.035;
+        p.life -= 1;
+
+        if (p.life <= 0) {
+          fireworksParticles.splice(i, 1);
+          continue;
+        }
+
+        const alpha = Math.max(0, p.life / 80);
+        fireworksCtx.beginPath();
+        fireworksCtx.fillStyle = `hsla(${p.hue}, 95%, 62%, ${alpha})`;
+        fireworksCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        fireworksCtx.fill();
+      }
+
+      if (fireworksParticles.length === 0) {
+        cancelAnimationFrame(fireworksRafId);
+        fireworksRafId = null;
+      }
+    }
+
+    function spawnBurst(x, y, count = 56) {
+      for (let i = 0; i < count; i += 1) {
+        const angle = (Math.PI * 2 * i) / count;
+        const speed = 2 + Math.random() * 5;
+        fireworksParticles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 62 + Math.random() * 18,
+          size: 2 + Math.random() * 4,
+          hue: 120 + Math.random() * 220,
+        });
+      }
+
+      if (!fireworksRafId) animateFireworks();
+    }
+
+    function triggerCelebrationBursts() {
+      const points = [
+        [window.innerWidth * 0.25, window.innerHeight * 0.35],
+        [window.innerWidth * 0.75, window.innerHeight * 0.35],
+        [window.innerWidth * 0.5, window.innerHeight * 0.25],
+        [window.innerWidth * 0.3, window.innerHeight * 0.55],
+        [window.innerWidth * 0.7, window.innerHeight * 0.55],
+      ];
+
+      points.forEach(([x, y], idx) => {
+        setTimeout(() => spawnBurst(x, y, 64), idx * 130);
+      });
+    }
+
+    function hideWinnerPopup() {
+      const popup = document.getElementById('winnerPopup');
+      popup.classList.add('hidden');
+      popup.classList.remove('flex');
+      popupVisible = false;
+    }
+
+    function showWinnerPopup(winner) {
+      const popup = document.getElementById('winnerPopup');
+      const profile = findProfileById(winner.profileId) || null;
+      const sourceProfile = profile || lastPreviewProfile || null;
+      const avatar = sourceProfile?.avatar || LOGO_FALLBACK;
+      const handle = sourceProfile?.handle || '';
+      const displayName = sourceProfile?.name || winner.name || 'Winner';
+
+      document.getElementById('winnerAvatar').src = avatar;
+      document.getElementById('winnerHandle').textContent = handle;
+      document.getElementById('winnerDisplayName').textContent = displayName;
+      document.getElementById('winnerCoinIcon').innerHTML = '';
+      document.getElementById('winnerCoinAmount').textContent = formatUsdByCoins(winner.amount);
+
+      popup.classList.remove('hidden');
+      popup.classList.add('flex');
+      popupVisible = true;
+    }
+
+    function celebrateWinnerIfEligible(winner) {
+      const amount = Number(winner?.amount || 0);
+      if (!winner || amount <= 0) return;
+      triggerCelebrationBursts();
+      showWinnerPopup(winner);
+    }
+
+    function formatUsdByCoins(coins) {
+      const numeric = Number(coins) || 0;
+      return `${coinSettings.symbol}${(numeric * coinSettings.rate).toFixed(2)}`;
+    }
+
+    /* ── Custom amount keypad (last grid seat) ──── */
+
+    let keypadStr = '0';
+    let keypadFromSpin = false;
+
+    function customSeatIndex() {
+      return getGridSeatCount() - 1;
+    }
+
+    function openKeypad(fromSpin) {
+      keypadFromSpin = !!fromSpin;
+      keypadStr = '0';
+      updateKeypad();
+      document.getElementById('kpCoin').innerHTML = coinIconHtml(28);
+      document.getElementById('kpOverlay').style.display = 'block';
+      requestAnimationFrame(() => document.getElementById('kpSheet').classList.add('open'));
+    }
+
+    function closeKeypad() {
+      document.getElementById('kpSheet').classList.remove('open');
+      setTimeout(() => { document.getElementById('kpOverlay').style.display = 'none'; }, 350);
+    }
+
+    function updateKeypad() {
+      const n = parseInt(keypadStr, 10) || 0;
+      document.getElementById('kpValue').textContent = n.toLocaleString();
+      document.getElementById('kpApprox').textContent = '≈ ' + formatUsdByCoins(n);
+      document.getElementById('kpTotal').textContent = '≈ ' + formatUsdByCoins(n);
+      document.getElementById('kpConfirm').disabled = n <= 0;
+    }
+
+    function pressKey(k) {
+      if (k === 'back') keypadStr = keypadStr.length > 1 ? keypadStr.slice(0, -1) : '0';
+      else if (k === '000') keypadStr = keypadStr === '0' ? '0' : keypadStr + '000';
+      else keypadStr = keypadStr === '0' ? k : keypadStr + k;
+      if (keypadStr.length > 12) keypadStr = keypadStr.slice(0, 12);
+      updateKeypad();
+    }
+
+    function confirmKeypad() {
+      const amount = parseInt(keypadStr, 10) || 0;
+      if (amount <= 0) return;
+      closeKeypad();
+      if (keypadFromSpin && state.winner) {
+        state.winner = { ...state.winner, amount };
+        sendState();
+        setTimeout(() => celebrateWinnerIfEligible(state.winner), 320);
+      } else {
+        setTimeout(() => celebrateWinnerIfEligible({ seatIndex: customSeatIndex(), amount }), 320);
+      }
+    }
+
+    function updateBuyButton() {
+      // no-op: payment button removed
+    }
+
+    /* ── Order Summary / Payment flow ───────────── */
+
+    function openOrderDrawer() {
+      const coins = Number(state.prizes[selectedPackIndex] || 0);
+      const price = formatUsdByCoins(coins);
+      const username = document.getElementById('nameInput').value.trim() || '';
+      document.getElementById('orderAccount').textContent = username;
+      document.getElementById('orderCoins').textContent = formatUsdByCoins(coins);
+      document.getElementById('orderPrice').textContent = price;
+      document.getElementById('orderTotal').textContent = price;
+      const payText = document.getElementById('payNowBtnText');
+      if (coins > 0) {
+        payText.textContent = `Pay ${price}`;
+        document.getElementById('payNowBtn').disabled = false;
+      } else {
+        payText.textContent = 'Pay now';
+        document.getElementById('payNowBtn').disabled = true;
+      }
+      const overlay = document.getElementById('orderOverlay');
+      const drawer = document.getElementById('orderDrawer');
+      overlay.style.display = '';
+      drawer.style.display = 'flex';
+      overlay.classList.remove('hiding');
+      drawer.classList.remove('hiding');
+      overlay.classList.add('show');
+      drawer.classList.add('show');
+    }
+
+    function closeOrderDrawer() {
+      const overlay = document.getElementById('orderOverlay');
+      const drawer = document.getElementById('orderDrawer');
+      overlay.classList.add('hiding');
+      drawer.classList.add('hiding');
+      overlay.classList.remove('show');
+      drawer.classList.remove('show');
+      setTimeout(() => {
+        overlay.style.display = 'none';
+        drawer.style.display = 'none';
+        overlay.classList.remove('hiding');
+        drawer.classList.remove('hiding');
+      }, 400);
+    }
+
+    function selectPaymentMethod(method) {
+      const savedCardOpt = document.getElementById('savedCardOption');
+      const newCardOpt = document.getElementById('newCardOption');
+      const applePayOpt = document.getElementById('applePayOption');
+      [savedCardOpt, newCardOpt, applePayOpt].forEach(opt => {
+        if (opt) { opt.classList.remove('border-red-500','bg-red-50'); opt.classList.add('border-gray-200'); }
+      });
+      if (method === 'saved-card' && savedCardOpt) {
+        savedCardOpt.classList.add('border-red-500','bg-red-50'); savedCardOpt.classList.remove('border-gray-200');
+        document.getElementById('savedCardRadio').checked = true;
+        document.getElementById('applePayRadio').checked = false;
+        document.getElementById('cardForm').classList.add('hidden');
+      } else if (method === 'new-card') {
+        newCardOpt.classList.add('border-red-500','bg-red-50'); newCardOpt.classList.remove('border-gray-200');
+        document.getElementById('savedCardRadio').checked = false;
+        document.getElementById('applePayRadio').checked = false;
+        document.getElementById('cardForm').classList.remove('hidden');
+      } else if (method === 'applepay') {
+        applePayOpt.classList.add('border-red-500','bg-red-50'); applePayOpt.classList.remove('border-gray-200');
+        document.getElementById('applePayRadio').checked = true;
+        document.getElementById('savedCardRadio').checked = false;
+        document.getElementById('cardForm').classList.add('hidden');
+      }
+    }
+
+    async function loadSavedCard() {
+      const storageKey = `saved_card_${roomId}`;
+      let saved = localStorage.getItem(storageKey);
+      if (!saved) {
+        try {
+          const resp = await fetch(`/api/layout?key=${encodeURIComponent(roomId + '-saved-card')}`, { credentials: 'include' });
+          const data = await resp.json();
+          if (data.ok && data.style && data.style.displayName) {
+            saved = JSON.stringify(data.style);
+            localStorage.setItem(storageKey, saved);
+          }
+        } catch { /* ignore */ }
+      }
+      if (saved) {
+        try {
+          const cardData = JSON.parse(saved);
+          document.getElementById('savedCardOption').classList.remove('hidden');
+          document.getElementById('savedCardText').textContent = cardData.displayName;
+          updateCardIcon(cardData.type);
+          selectPaymentMethod('saved-card');
+        } catch { selectPaymentMethod('new-card'); document.getElementById('cardForm').classList.remove('hidden'); }
+      } else {
+        selectPaymentMethod('new-card');
+        document.getElementById('cardForm').classList.remove('hidden');
+      }
+    }
+
+    function updateCardIcon(cardType) {
+      const el = document.getElementById('savedCardIcon');
+      if (!el) return;
+      const icons = {
+        Visa: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAAA8CAYAAACZ1L+0AAAACXBIWXMAACE4AAAhOAFFljFgAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAbISURBVHgB7Zw/bFtFHMfPTgaWNPEWJUtYqD1RpNrKRtpm6NQmSEgMJYmYAglqJiSQOoGIYEolCiygpgWpAqkOLGRIabqhBolsdie8BHXLny4wxOa+jq+6XO5+v7tny7fcR3KUOC/v7t339+9+78U50WF/f38kn8/fbLVaU7lcbkokeo5c2135ul0oFO6q93L4Ihd/Qi7+Y/nthEj0g0az2bwkhWi0BTg8PPxbpMXvNxDhjQFp/Qsy5CyIRL8ZkeHovzzivkhEYWBg4M2cDD8tkYhGXiSikgSITBIgMkmAyCQBIpMEiEwSIDJJgMgkASIziC+1+nPx6HFdhFI6PyquXC4G/c3ePwei+suu8/fjYyNi9vqFlz9/9c2289jKxQlRKU8Iihcv/hUP5XjPnj0XT3ca4kj+jPf08cbHR0RRXos639DQK8IXXM/W7/VT5wyZ46Ca5N7egajLSeIVAi6g+vOi96SxCHeIRf3805mX39fkXKhjS2vvuMf582QcjEeBBcQLx9374Y/2e9WfFkWxOCo4cPzql5v0+aUxsQLgAHUQhMDkcXIfMTB5WOnHH10VPlALCjGnNY+q1+nxcbwJjAnzUYuZBXgEB66bW3ywwxhA3jY4QgCs+qG0hJlrFwTHBhFSdGBlmLiL8sXT7k8ZwDl5nGmlWPz59+52tfgIRT7eTBmSDq7XFZ4AmYRL8gJXP5tpC0FNCnGVWljFxq+0UMvvT536mQof5y0hAhZZCwyhJjavssGFNh1qTl5VUITQE6MNLlxwybcsQ6Dp+pQHILnp4NxVT0+k4JK6GsvH4BTU2gwKT65cKpKuDZWpioizmFkj1HHHmwvFhR1UbNelEek55ujoxHN3ZM7DeBDcN/mGgHPP3Zi0/s5bAEwMYcgVzzgPoCZtlp6ACyVYUAUWkfIWnH/9+4UzYXR87MS7lSgox0uMAEqoEOrdhiCApKdfdMggNaa8XTJiP4BVujATZY0RH9bnk1hLHtZP5TFX/qAScdBOuGzEXd9B7jMuW7Gcl/Io80KpKgNk2WTaoPIYcliZyB+ukBokAJegbGEDFRJ2ii5Q5prJl6uqfBKlDi7+k1sbQYnTdR4XyGFFIkI8dXh0sACUK9us9hGxTQezM2erKy4Bm4nSt3LBHqGbSomq/ZFHqHm4QnBwM47KAzYPoJKv6r+YcEnO/BuEpAoRHhXwAHjC9NW1YCGo0hNePNTJkS4DdYXUYAEuE6WmOQiXfF2lGbV9d8VZ9JB8+1G6EL5hidrt617sSsSusNpTD8Bi6+HmfmDpqaBKUNf4yCO+/SgFFuStt79th0nuOFcMN72vEpiIgwXg8gCaedSACldFVTNEPDM+EWogKNomvu0EAMtcXnngXGBAxX7zOoqBpXqmGzKUysp6ue36sqX2B1k6oDqo5de/W/BqIup8ePOBVXgIRBnSvBFGQxNxJgGo/YAahIqZaGu4Wr6hHVAbODeaiFu/rXgLgYVet4RMhCeXIcEYzPngvZBEnEmAaSoRywWkYiaYe3fS+bvQDiiFLoRPWLLtvqnws+TwYleegsimCN69IB2lss1lMQB306Xi4UE2fEpN65hSiK3NFbH6xaa496O7MDAXh7t/gRLb1pqoMW0Z3WsyCQDQ+bSFGW7n67IaENoBDWXpgylRlQvGtS4U3P2L0KYcQGTQq7/MT0VQ2T5rFRPSAc3COWafMKaFKe7+RVZML8sswHTg0xDA1vfRCemAgtAez52vt0nj0I2qutH7xQfmXilzCGo/ziFfIQ2uZSL8AH0PYRvPBB6j7oTBO7BLhodBZIgFi1eJD7GfC3G6UXHhpxswbxUJMgsAcMF7nm5qu+Wo014oKgFb4r/uMbgovLLekIfA6o5e6C3HUGAQPREAJ/F9ImL2Wnf3lG31P+UxoWDzpthgHhzTn11yAWNyPbai57quBGhbzC3+OKrvo6D2DcBM3pzHhIAFVd7J7WHKHk/jARiMSwC92djVs6GIsT4bHOx8OUI7oJzH+NC+VywtXzcO7nmf+RuTwgdqbfS7h10/nOvzbOicx6QzdUADmm46SNBLi1Pth890a1bPebqwtR4oyh49s65CEEBpeUSUdqXXRtlH/fD3lJC232HhsLvFDXmEIvRsVFgyS03U9xAR84A3ukIIHlOh5jHt4cmhx6f/E45M+v+AyCQBIpMEiEwSIDJJgMgkASKTBIhMEiAySYDI5HO53LZIxGI3f3x8/EQkotBsNm/nOh/Y+pdIH1vZbxrDw8Ov5guFwgE+RBRviES/aHTW/OSTcxWdzxBdka/XRaLntFqtJ8i5cvHXYPh4739wGafOUDA7hgAAAABJRU5ErkJggg==',
+        Mastercard: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAyNCAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iOSIgY3k9IjgiIHI9IjYiIGZpbGw9IiNFQjAwMUIiLz4KPGNpcmNsZSBjeD0iMTUiIGN5PSI4IiByPSI2IiBmaWxsPSIjRjc5RTFCIi8+Cjwvc3ZnPgo=',
+        Amex: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAyNCAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjE2IiByeD0iMiIgZmlsbD0iIzAwNkZDRiIvPgo8dGV4dCB4PSI1IiB5PSIxMiIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjciIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSJ3aGl0ZSI+QU1FWDwvdGV4dD4KPC9zdmc+Cg==',
+      };
+      const src = icons[cardType];
+      if (src) {
+        el.innerHTML = `<img src="${src}" alt="${cardType}" class="h-4 w-full">`;
+        el.classList.remove('bg-gray-100');
+      } else {
+        el.innerHTML = '<svg width="24" height="16" viewBox="0 0 24 16" fill="none" class="w-full h-full"><path d="M14.625 11.25C14.4179 11.25 14.25 11.4179 14.25 11.625V12.375C14.25 12.5821 14.4179 12.75 14.625 12.75H17.625C17.8321 12.75 18 12.5821 18 12.375V11.625C18 11.4179 17.8321 11.25 17.625 11.25H14.625Z" fill="black"></path><path fill-rule="evenodd" clip-rule="evenodd" d="M4.5 2.625C3.67157 2.625 3 3.29657 3 4.125V13.875C3 14.7034 3.67157 15.375 4.5 15.375H19.5C20.3284 15.375 21 14.7034 21 13.875V4.125C21 3.29657 20.3284 2.625 19.5 2.625H4.5ZM4.5 4.125H19.5V5.8125H4.5V4.125ZM4.5 7.3125H19.5V13.875H4.5V7.3125Z" fill="black"></path></svg>';
+        el.classList.add('bg-gray-100');
+      }
+    }
+
+    function saveCard() {
+      const number = document.getElementById('cardNumber').value.trim();
+      const expiry = document.getElementById('cardExpiry').value.trim();
+      const cvv = document.getElementById('cardCVV').value.trim();
+      const name = document.getElementById('cardName').value.trim();
+      if (!number || !expiry || !cvv || !name) { alert('Please fill in all card details'); return; }
+      if (number.replace(/\s/g,'').length < 15) { alert('Please enter a valid card number'); return; }
+      if (expiry.length !== 5) { alert('Please enter valid expiry date (MM/YY)'); return; }
+      const cleanNumber = number.replace(/\s/g,'');
+      const last4 = cleanNumber.slice(-4);
+      let cardType = 'Card';
+      if (cleanNumber.startsWith('4')) cardType = 'Visa';
+      else if (cleanNumber.startsWith('5')) cardType = 'Mastercard';
+      else if (cleanNumber.startsWith('3')) cardType = 'Amex';
+      const cardData = { displayName: `${cardType} •••• ${last4}`, last4, expiry, name, type: cardType };
+      localStorage.setItem(`saved_card_${roomId}`, JSON.stringify(cardData));
+      saveCardToServer(cardData);
+      document.getElementById('savedCardText').textContent = cardData.displayName;
+      document.getElementById('savedCardOption').classList.remove('hidden');
+      updateCardIcon(cardData.type);
+      document.getElementById('cardNumber').value = '';
+      document.getElementById('cardExpiry').value = '';
+      document.getElementById('cardCVV').value = '';
+      document.getElementById('cardName').value = '';
+      document.getElementById('cardForm').classList.add('hidden');
+      selectPaymentMethod('saved-card');
+    }
+
+    function saveCardToServer(cardData) {
+      fetch('/api/layout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ key: roomId + '-saved-card', style: cardData }),
+      }).catch(() => {});
+    }
+
+    function showPaymentProcessing() {
+      const modal = document.getElementById('paymentProcessingModal');
+      modal.style.display = 'flex';
+      let remainingSeconds = 300;
+      const countdownEl = document.getElementById('paymentCountdown');
+      function updateCountdown() {
+        const mins = Math.floor(remainingSeconds / 60);
+        const secs = remainingSeconds % 60;
+        countdownEl.textContent = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+        if (remainingSeconds > 0) remainingSeconds--;
+      }
+      updateCountdown();
+      const interval = setInterval(updateCountdown, 1000);
+      return new Promise(resolve => {
+        const processingTime = Math.floor(Math.random() * 2000) + 1000;
+        setTimeout(() => {
+          clearInterval(interval);
+          modal.style.display = 'none';
+          resolve();
+        }, processingTime);
+      });
+    }
+
+    function showSuccessScreen() {
+      const coins = Number(state.prizes[selectedPackIndex] || 0);
+      const username = document.getElementById('nameInput').value.trim() || 'user';
+      document.getElementById('successMsg').textContent = `${formatUsdByCoins(coins)} reward was sent to ${username}`;
+      document.getElementById('successScreen').style.display = 'flex';
+    }
+
+    function closeSuccessScreen() {
+      document.getElementById('successScreen').style.display = 'none';
+      document.getElementById('nameInput').value = '';
+      document.getElementById('nameInput2').value = '';
+      document.getElementById('profilePreview').classList.add('hidden');
+      lastPreviewProfile = null;
+    }
+
+    async function handlePayNow() {
+      closeOrderDrawer();
+      await new Promise(r => setTimeout(r, 450));
+      await showPaymentProcessing();
+
+      // Deduct purchased coins from totalCoins
+      const coins = Number(state.prizes[selectedPackIndex] || 0);
+      totalCoins = Math.max(0, totalCoins - coins);
+      localStorage.setItem('tiktok_total_coins', String(totalCoins));
+      applyDisplayMode();
+      sendState();
+
+      showSuccessScreen();
+    }
+
+    function renderCoinGrid() {
+      const grid = document.getElementById('coinGrid');
+      grid.innerHTML = '';
+      grid.style.gridTemplateColumns = `repeat(${gridCols}, minmax(0, 1fr))`;
+      ensureGridCapacity();
+      const seatCount = getGridSeatCount();
+
+      state.prizes.slice(0, seatCount).forEach((coins, index) => {
+        const li = document.createElement('li');
+        li.className = 'list-none overflow-hidden';
+        li.style.cursor = 'pointer';
+
+        const isSelected = index === selectedPackIndex;
+        const bgClass = isSelected ? 'border border-emerald-400' : '';
+        const bgStyle = isSelected ? 'background: rgba(16,185,129,0.15);' : 'background: #1e293b;';
+
+        const isCustom = index === customSeatIndex();
+        const label = isCustom ? 'Custom' : String(Number(coins || 0));
+        const sub = isCustom
+          ? 'For large<br>amounts'
+          : `${coinSettings.symbol}${(Number(coins || 0) * coinSettings.rate).toFixed(2)}`;
+
+        li.innerHTML = `<div class="rounded-lg w-full h-full min-h-16 py-2 flex flex-col justify-center items-center text-center relative cursor-pointer ${bgClass}" style="${bgStyle}">
+            ${coinSettings.showCoin ? `<div class="flex justify-center">${coinIconHtml(coinSettings.coinSize)}</div>` : ''}
+            <b class="text-lg font-bold text-white leading-tight">${label}</b>
+            <div class="text-xs text-gray-400 leading-tight">${sub}</div>
+          </div>`;
+
+        li.addEventListener('click', () => {
+          selectPack(index);
+          if (isCustom && !isSpinAnimating) openKeypad(false);
+        });
+        grid.appendChild(li);
+      });
+    }
+
+    /* ── Reward panel ──────────────────────────── */
+
+    function render() {
+      renderCoinGrid();
+      updateBuyButton();
+      applyDisplayMode();
+    }
+
+    function restoreCustomIcon() {
+      const saved = localStorage.getItem('tiktok_custom_icon');
+      if (saved) {
+        const btn = document.getElementById('tiktokIconBtn');
+        btn.innerHTML = `<img src="${saved}" class="w-full h-full object-cover" alt="custom icon" />`;
+        btn.classList.remove('bg-black');
+        updateMode2Icon(saved);
+      }
+    }
+
+    function updateMode2Icon(dataUrl) {
+      const m2btn = document.getElementById('mode2IconBtn');
+      if (m2btn) {
+        m2btn.innerHTML = `<img src="${dataUrl}" class="w-full h-full object-cover" alt="custom icon" />`;
+        m2btn.classList.remove('bg-black');
+      }
+    }
+
+    function applyDisplayMode() {
+      const m1 = document.getElementById('mode1Header');
+      const m2 = document.getElementById('mode2Header');
+      if (displayMode === 'mode-2') {
+        m1.classList.add('hidden');
+        m2.classList.remove('hidden');
+        const showCurrency = coinSettings.headerUnit === 'currency';
+        document.getElementById('mode2HeaderCoin').style.display = showCurrency ? 'none' : '';
+        document.getElementById('mode2CoinDisplay').textContent = showCurrency
+          ? coinSettings.symbol + (totalCoins * coinSettings.rate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : totalCoins.toLocaleString();
+      } else {
+        m1.classList.remove('hidden');
+        m2.classList.add('hidden');
+      }
+    }
+
+    /* ── Reset ─────────────────────────────────── */
+
+    function resetAll() {
+      if (!confirm('Reset all?')) return;
+      Object.assign(state, defaultState());
+      selectedPackIndex = 0;
+      lastPreviewProfile = null;
+      document.getElementById('nameInput').value = '';
+      document.getElementById('profilePreview').classList.add('hidden');
+      hideWinnerPopup();
+      sendState();
+      render();
+    }
+
+    /* ── Events ────────────────────────────────── */
+
+    function bindEvents() {
+      document.getElementById('nameInput').addEventListener('input', autoPreview);
+      document.getElementById('nameInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          autoPreview();
+        }
+      });
+
+      // Mode 2 username input syncs with mode 1 input
+      document.getElementById('nameInput2').addEventListener('input', () => {
+        document.getElementById('nameInput').value = document.getElementById('nameInput2').value;
+        autoPreview();
+      });
+      document.getElementById('nameInput2').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          document.getElementById('nameInput').value = document.getElementById('nameInput2').value;
+          autoPreview();
+        }
+      });
+
+      // Mode 2 icon click uploads too
+      document.getElementById('mode2IconBtn').addEventListener('click', () => document.getElementById('iconUpload').click());
+
+      document.getElementById('resetBtn').addEventListener('click', resetAll);
+
+      // Icon upload
+      document.getElementById('tiktokIconBtn').addEventListener('click', () => document.getElementById('iconUpload').click());
+      document.getElementById('iconUpload').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const dataUrl = ev.target.result;
+          const btn = document.getElementById('tiktokIconBtn');
+          btn.innerHTML = `<img src="${dataUrl}" class="w-full h-full object-cover" alt="custom icon" />`;
+          btn.classList.remove('bg-black');
+          localStorage.setItem('tiktok_custom_icon', dataUrl);
+          updateMode2Icon(dataUrl);
+        };
+        reader.readAsDataURL(file);
+        e.target.value = '';
+      });
+
+      // Restore saved icon on load
+      restoreCustomIcon();
+
+      /* ── Buy / Order / Pay / Process / Success flow ── */
+      document.getElementById('claimRewardBtn').addEventListener('click', hostSpin);
+      initSpinZone();
+      document.getElementById('kpClose').addEventListener('click', closeKeypad);
+      document.getElementById('kpOverlay').addEventListener('click', closeKeypad);
+      document.getElementById('kpGrid').addEventListener('click', (e) => {
+        const btn = e.target.closest('.kp-key');
+        if (btn) pressKey(btn.getAttribute('data-key'));
+      });
+      document.getElementById('kpConfirm').addEventListener('click', confirmKeypad);
+      document.getElementById('orderBackBtn').addEventListener('click', closeOrderDrawer);
+      document.getElementById('orderOverlay').addEventListener('click', closeOrderDrawer);
+      document.getElementById('payNowBtn').addEventListener('click', handlePayNow);
+      document.getElementById('successGoBack').addEventListener('click', closeSuccessScreen);
+
+      // Payment method selection
+      const savedCardOpt = document.getElementById('savedCardOption');
+      const newCardOpt = document.getElementById('newCardOption');
+      const applePayOpt = document.getElementById('applePayOption');
+      savedCardOpt.addEventListener('click', () => selectPaymentMethod('saved-card'));
+      newCardOpt.addEventListener('click', () => { selectPaymentMethod('new-card'); document.getElementById('cardForm').classList.remove('hidden'); });
+      applePayOpt.addEventListener('click', () => selectPaymentMethod('applepay'));
+
+      // Card form prevent bubble
+      document.getElementById('cardForm').addEventListener('click', e => e.stopPropagation());
+      document.getElementById('saveCardBtn').addEventListener('click', saveCard);
+
+      // Card input formatting
+      const cardNumEl = document.getElementById('cardNumber');
+      cardNumEl.addEventListener('input', e => {
+        let v = e.target.value.replace(/\s/g, '');
+        e.target.value = v.match(/.{1,4}/g)?.join(' ') || v;
+      });
+      cardNumEl.addEventListener('keypress', e => { if (!/[0-9]/.test(e.key) && e.key !== 'Backspace') e.preventDefault(); });
+
+      const cardExpEl = document.getElementById('cardExpiry');
+      cardExpEl.addEventListener('input', e => {
+        let v = e.target.value.replace(/\D/g, '');
+        if (v.length >= 2) v = v.slice(0,2) + '/' + v.slice(2,4);
+        e.target.value = v;
+      });
+      cardExpEl.addEventListener('keypress', e => { if (!/[0-9]/.test(e.key) && e.key !== 'Backspace') e.preventDefault(); });
+
+      document.getElementById('cardCVV').addEventListener('keypress', e => { if (!/[0-9]/.test(e.key) && e.key !== 'Backspace') e.preventDefault(); });
+
+      loadSavedCard();
+
+      // Back to the portal without signing out (logout lives on the portal).
+      document.getElementById('logoutBtn').addEventListener('click', () => {
+        window.location.href = 'portal.html';
+      });
+
+      const popup = document.getElementById('winnerPopup');
+      popup.addEventListener('click', () => {
+        if (!popupVisible) return;
+        hideWinnerPopup();
+        document.getElementById('nameInput').value = '';
+        document.getElementById('nameInput2').value = '';
+        document.getElementById('profilePreview').classList.add('hidden');
+        lastPreviewProfile = null;
+      });
+
+      window.addEventListener('resize', resizeFireworksCanvas);
+
+      window.addEventListener('storage', (event) => {
+        if (event.key !== STORAGE_KEY || !event.newValue) return;
+        try {
+          const prevWinner = state.winner;
+          mergeState(JSON.parse(event.newValue));
+          maybeAnimateWinner(prevWinner, state.winner);
+          render();
+        } catch { /* ignore */ }
+      });
+    }
+
+    /* ── Init ──────────────────────────────────── */
+
+    (async function init() {
+      const ok = await requireAuth();
+      if (!ok) return;
+      resizeFireworksCanvas();
+      bindEvents();
+      startAuthWatcher();
+      render();
+    })();
+
+    window.addEventListener('beforeunload', () => {
+      if (authWatchTimer) clearInterval(authWatchTimer);
+    });
+  </script>
+</body>
+</html>

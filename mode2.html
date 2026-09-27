@@ -1,0 +1,1052 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="TikTok Reward" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mode 2 Remote - TikTok Claim Reward</title>
+  <link rel="icon" type="image/png" href="image/tiktokicon.png" />
+  <link rel="apple-touch-icon" href="image/tiktokicon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    :root {
+      --bg: #101316;
+      --panel: #181d23;
+      --line: #2c3440;
+      --ink: #ebf0f8;
+      --muted: #8ea0b8;
+      --accent: #37e6b5;
+      --accent-2: #5cc8ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(1200px 600px at 90% -20%, rgba(92, 200, 255, 0.13), transparent 65%),
+        radial-gradient(900px 500px at 10% -10%, rgba(55, 230, 181, 0.13), transparent 65%),
+        var(--bg);
+      padding: 24px;
+      overflow-x: hidden;
+    }
+    .page { max-width: 1150px; margin: 0 auto; display: grid; gap: 14px; }
+    .header, .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+    }
+    .header h2 { margin: 0; }
+    .header p { margin: 8px 0 0; color: var(--muted); }
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .live-controls {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .live-controls input {
+      height: 40px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #0f141b;
+      color: var(--ink);
+      padding: 0 10px;
+      min-width: 220px;
+    }
+    .live-status {
+      color: var(--muted);
+      font-size: 13px;
+      width: 100%;
+    }
+    button {
+      height: 40px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      padding: 0 14px;
+      color: var(--ink);
+      background: #0f141b;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button.primary {
+      border-color: transparent;
+      color: #072113;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    }
+    button.warn {
+      border-color: #5f2d37;
+      color: #ff9daf;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .cell {
+      border-radius: 8px;
+      background: #1a2030;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 64px;
+      cursor: pointer;
+      position: relative;
+      border: 1px solid var(--line);
+    }
+    .cell.win {
+      border-color: var(--accent);
+      background: #0f2a20;
+      box-shadow: 0 0 12px rgba(55, 230, 181, 0.3);
+    }
+    .cell .coin-row {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      justify-content: center;
+    }
+    .cell .coin-row svg { width: 16px; height: 16px; }
+    .cell .coin-input {
+      background: transparent;
+      border: none;
+      color: var(--ink);
+      font-size: 18px;
+      font-weight: 700;
+      width: 70px;
+      text-align: center;
+      outline: none;
+      padding: 0;
+    }
+    .cell .coin-input:focus {
+      border-bottom: 1px solid var(--accent);
+    }
+    .cell .grid-label {
+      font-size: 10px;
+      color: var(--muted);
+      position: absolute;
+      top: 4px;
+      left: 6px;
+    }
+    .cell.win {
+      border-color: var(--accent);
+      box-shadow: inset 0 0 0 1px rgba(55, 230, 181, 0.4), 0 10px 24px rgba(55, 230, 181, 0.2);
+      background: #0f1f1a;
+    }
+    .cell.editing {
+      border-color: var(--accent);
+    }
+    .row-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .profile {
+      font-size: 15px;
+      font-weight: 700;
+      min-height: 20px;
+      word-break: break-word;
+    }
+    .profile.empty { color: #5f6f82; font-weight: 500; }
+    .prize {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: auto;
+    }
+    .prize span { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; }
+    .prize span svg { width: 22px; height: 22px; }
+    .prize input {
+      width: 100%;
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #0d1218;
+      color: var(--ink);
+      padding: 0 10px;
+      font-weight: 700;
+    }
+    .winner-board {
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #0f141b;
+      padding: 12px;
+      color: var(--muted);
+    }
+    .winner-board strong { color: var(--ink); }
+    .layout-editor {
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #0d1218;
+      padding: 10px;
+      display: none;
+    }
+    .layout-editor.open { display: block; }
+    .layout-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .layout-grid label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .layout-grid input {
+      width: 100%;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #111722;
+      color: var(--ink);
+      padding: 0 8px;
+    }
+    #fireworksLayer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+    @media (max-width: 900px) {
+      .layout-grid { grid-template-columns: 1fr; }
+    }
+    .lang-switch { display:flex; gap:6px; justify-content:flex-end; margin-bottom:8px; }
+    .lang-switch button { padding:4px 10px; border-radius:999px; border:1px solid #444; background:#2a2a2a; color:#ccc; font-size:13px; font-weight:700; cursor:pointer; }
+    .lang-switch button.lang-active { background:#fff; color:#111; border-color:#fff; }
+  </style>
+</head>
+<body>
+  <canvas id="fireworksLayer"></canvas>
+  <div class="page">
+    <section class="header">
+      <div class="lang-switch"><button type="button" data-lang="en">EN</button><button type="button" data-lang="zh">中文</button></div>
+      <h2 data-i18n="mode2Title">Mode 2 Remote Control</h2>
+      <p data-i18n="mode2Subtitle">Customize coin reward per grid, then click spin to randomly choose one winner seat.</p>
+      <div class="actions">
+        <button id="spinBtn" class="primary" data-i18n="spinRandom">Spin Random Winner</button>
+        <button id="clearWinnerBtn" data-i18n="clearWinner">Clear Winner</button>
+        <button id="toggleLayoutBtn">Open Edit Layout</button>
+        <button id="saveLayoutBtn" data-i18n="saveLayout">Save Layout</button>
+        <button id="resetLayoutBtn" class="warn" data-i18n="resetLayout">Reset Layout</button>
+      </div>
+      <div class="style-controls" style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <span style="font-weight:600;color:#ccc;font-size:14px;" data-i18n="displayStyle">Display Style:</span>
+        <button id="styleMode1Btn" class="primary" style="min-width:80px;" data-i18n="mode1">Mode 1</button>
+        <button id="styleMode2Btn" style="min-width:80px;" data-i18n="mode2">Mode 2</button>
+        <span style="margin-left:12px;font-weight:600;color:#ccc;font-size:14px;" data-i18n="totalCoins">Total Coins:</span>
+        <input id="totalCoinsInput" type="number" min="0" step="100" value="0" style="width:120px;padding:6px 10px;border-radius:6px;border:1px solid #444;background:#2a2a2a;color:#fff;font-size:14px;" />
+        <span style="margin-left:12px;font-weight:600;color:#ccc;font-size:14px;" data-i18n="underRecharge">Under Recharge:</span>
+        <select id="headerUnitInput" style="padding:6px 10px;border-radius:6px;border:1px solid #444;background:#2a2a2a;color:#fff;font-size:14px;">
+          <option value="coin" data-i18n="unitCoin">Coin</option>
+          <option value="currency" data-i18n="unitCurrency">Currency</option>
+        </select>
+      </div>
+      <div class="style-controls" style="margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+        <span style="font-weight:600;color:#ccc;font-size:14px;" data-i18n="coinCurrency">Coin &amp; Currency:</span>
+        <label style="color:#ccc;font-size:13px;display:inline-flex;align-items:center;gap:4px;">
+          <span data-i18n="usdPerCoin">USD / coin</span>
+          <input id="coinRateInput" type="number" min="0" step="0.0001" value="0.0104" style="width:90px;padding:6px 8px;border-radius:6px;border:1px solid #444;background:#2a2a2a;color:#fff;font-size:14px;" />
+        </label>
+        <label style="color:#ccc;font-size:13px;display:inline-flex;align-items:center;gap:4px;">
+          <span data-i18n="symbol">Symbol</span>
+          <input id="coinSymbolInput" type="text" maxlength="6" value="US$" style="width:60px;padding:6px 8px;border-radius:6px;border:1px solid #444;background:#2a2a2a;color:#fff;font-size:14px;" />
+        </label>
+        <label style="color:#ccc;font-size:13px;display:inline-flex;align-items:center;gap:6px;">
+          <input id="showCoinInput" type="checkbox" checked /> <span data-i18n="showCoinMode1">Show coin on Mode 1</span>
+        </label>
+        <label style="color:#ccc;font-size:13px;display:inline-flex;align-items:center;gap:4px;">
+          <span data-i18n="coinSize">Coin size</span>
+          <input id="coinSizeInput" type="range" min="10" max="72" step="1" value="36" style="width:100px;" />
+          <span id="coinSizeVal">36</span>px
+        </label>
+      </div>
+      <div class="live-controls">
+        <input id="liveIdInput" placeholder="TikTok live id (without @)" />
+        <button id="connectLiveBtn" class="primary" data-i18n="connectLive">Connect Live</button>
+        <button id="stopLiveBtn" data-i18n="stopLive">Stop Live</button>
+        <div id="liveStatus" class="live-status">Live bridge idle.</div>
+      </div>
+      <div id="layoutEditor" class="layout-editor">
+        <div class="layout-grid">
+          <div>
+            <label for="gridRows">Grid Rows (2-10)</label>
+            <input id="gridRows" type="number" min="2" max="10" />
+          </div>
+          <div>
+            <label for="gridCols">Grid Columns (2-10)</label>
+            <input id="gridCols" type="number" min="2" max="10" />
+          </div>
+          <div>
+            <label for="fireworkWidth">Firework Width</label>
+            <input id="fireworkWidth" type="number" min="80" max="900" />
+          </div>
+          <div>
+            <label for="fireworkHeight">Firework Height</label>
+            <input id="fireworkHeight" type="number" min="80" max="900" />
+          </div>
+          <div>
+            <label for="fireworkOffsetX">Firework Offset X</label>
+            <input id="fireworkOffsetX" type="number" min="-600" max="600" />
+          </div>
+          <div>
+            <label for="fireworkOffsetY">Firework Offset Y</label>
+            <input id="fireworkOffsetY" type="number" min="-600" max="600" />
+          </div>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button id="applyGridBtn" type="button" class="primary" data-i18n="applyGridSize">Apply Grid Size</button>
+          <span id="gridInfo" class="live-status" style="width:auto;">Current grid: 2 x 3</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div id="grid" class="grid"></div>
+      <div class="winner-board" id="winnerBoard">No winner yet.</div>
+    </section>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'ttclaimreward-state-v1';
+    const CLIENT_ID = Math.random().toString(36).slice(2);
+    const MIN_GRID_SIZE = 2;
+    const MAX_GRID_SIZE = 10;
+    // Default coin rewards; the last seat is always the Custom (keypad) seat.
+    const DEFAULT_PRIZES = [1000, 2000, 5000, 8000, 10000];
+    const COIN_SVG = '<svg width="18" height="18" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="24" fill="#FFB84D"/><circle cx="24" cy="24" r="23" fill="#FFDE55"/><circle cx="24" cy="24" r="18" fill="#F7A80F"/><path d="M34.34 18.18a5.78 5.78 0 0 1-5.82-5.74h-3.87v15.63c0 1.94-1.6 3.5-3.56 3.5a3.53 3.53 0 0 1-3.55-3.5 3.53 3.53 0 0 1 4.52-3.38v-3.9a7.38 7.38 0 0 0-8.4 7.28 7.38 7.38 0 0 0 7.43 7.34c4.1 0 7.43-3.29 7.43-7.34v-7.98a9.73 9.73 0 0 0 5.82 1.92v-3.83Z" fill="white"/></svg>';
+    let roomId = 'public';
+    let ws = null;
+    let reconnectTimer = null;
+    let authWatchTimer = null;
+    let gridRows = 2;
+    let gridCols = 3;
+    let displayMode = localStorage.getItem('tiktok_display_mode') || 'mode-2';
+    let totalCoins = Number(localStorage.getItem('tiktok_total_coins')) || 0;
+
+    // Coin/currency settings pushed to Mode 1 (in the synced grid-state).
+    let coinSettings = { rate: 0.0104, symbol: 'US$', showCoin: true, coinSize: 36, headerUnit: 'coin' };
+    try {
+      const savedCoin = JSON.parse(localStorage.getItem('tiktok_coin_settings') || 'null');
+      if (savedCoin && typeof savedCoin === 'object') coinSettings = { ...coinSettings, ...savedCoin };
+    } catch { /* ignore */ }
+
+    const defaultLayout = {
+      fireworkWidth: 260,
+      fireworkHeight: 260,
+      fireworkOffsetX: 80,
+      fireworkOffsetY: 120,
+    };
+    let roomLayout = { ...defaultLayout };
+
+    const state = loadState();
+
+    function defaultState() {
+      return {
+        participants: [],
+        seatMap: Array(getGridSeatCount()).fill(null),
+        prizes: defaultPrizes(getGridSeatCount()),
+        gridRows,
+        gridCols,
+        winner: null,
+      };
+    }
+
+    function defaultPrizes(count) {
+      return normalizeArray(DEFAULT_PRIZES.slice(0, count), 100, count);
+    }
+
+    function isCustomSeat(index) {
+      return index === getGridSeatCount() - 1;
+    }
+
+    function clampGridSize(value, fallback = 3) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.min(MAX_GRID_SIZE, Math.max(MIN_GRID_SIZE, Math.floor(n)));
+    }
+
+    function getGridSeatCount() {
+      return gridRows * gridCols;
+    }
+
+    function normalizeArray(arr, fallbackValue, minSize = 0) {
+      const out = Array.isArray(arr) ? arr.slice() : [];
+      const target = Math.max(minSize, out.length);
+      for (let i = 0; i < target; i += 1) {
+        if (typeof out[i] === 'undefined') out[i] = fallbackValue;
+      }
+      return out;
+    }
+
+    function ensureGridCapacity() {
+      const seatCount = getGridSeatCount();
+      state.seatMap = normalizeArray(state.seatMap, null, seatCount);
+      state.prizes = normalizeArray(state.prizes, 100, seatCount);
+      if (state.winner && Number(state.winner.seatIndex) >= seatCount) {
+        state.winner = null;
+      }
+    }
+
+    function gridConfigKey() {
+      return `${roomId}-mode2-grid-config`;
+    }
+
+    function hydrateGridInputs() {
+      const rowsInput = document.getElementById('gridRows');
+      const colsInput = document.getElementById('gridCols');
+      const info = document.getElementById('gridInfo');
+      rowsInput.value = gridRows;
+      colsInput.value = gridCols;
+      info.textContent = `Current grid: ${gridRows} x ${gridCols}`;
+    }
+
+    function loadGridConfig() {
+      try {
+        const raw = localStorage.getItem(gridConfigKey());
+        if (!raw) {
+          gridRows = 2;
+          gridCols = 3;
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        gridRows = clampGridSize(parsed.rows, 2);
+        gridCols = clampGridSize(parsed.cols, 3);
+      } catch {
+        gridRows = 2;
+        gridCols = 3;
+      }
+    }
+
+    function persistGridConfig() {
+      localStorage.setItem(gridConfigKey(), JSON.stringify({ rows: gridRows, cols: gridCols }));
+    }
+
+    function applyGridSizeFromInputs() {
+      const rowsInput = document.getElementById('gridRows');
+      const colsInput = document.getElementById('gridCols');
+      gridRows = clampGridSize(rowsInput.value, gridRows);
+      gridCols = clampGridSize(colsInput.value, gridCols);
+      state.gridRows = gridRows;
+      state.gridCols = gridCols;
+      persistGridConfig();
+      hydrateGridInputs();
+      ensureGridCapacity();
+      syncState();
+      render();
+      updateLiveStatus(`Grid updated to ${gridRows} x ${gridCols}.`);
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return defaultState();
+        const parsed = JSON.parse(raw);
+        return {
+          participants: Array.isArray(parsed.participants) ? parsed.participants : [],
+          seatMap: normalizeArray(parsed.seatMap, null, getGridSeatCount()),
+          prizes: normalizeArray(parsed.prizes, 100, getGridSeatCount()),
+          gridRows: clampGridSize(parsed.gridRows, gridRows),
+          gridCols: clampGridSize(parsed.gridCols, gridCols),
+          winner: parsed.winner || null,
+        };
+      } catch {
+        return defaultState();
+      }
+    }
+
+    function mergeState(incoming) {
+      if (!incoming || typeof incoming !== 'object') return;
+      gridRows = clampGridSize(incoming.gridRows, gridRows);
+      gridCols = clampGridSize(incoming.gridCols, gridCols);
+      state.gridRows = gridRows;
+      state.gridCols = gridCols;
+      state.participants = Array.isArray(incoming.participants) ? incoming.participants : state.participants;
+      state.seatMap = normalizeArray(incoming.seatMap, null, getGridSeatCount());
+      state.prizes = normalizeArray(incoming.prizes, 100, getGridSeatCount());
+      state.winner = incoming.winner || null;
+      if (incoming.displayMode) {
+        displayMode = incoming.displayMode;
+        localStorage.setItem('tiktok_display_mode', displayMode);
+      }
+      if (typeof incoming.totalCoins === 'number') {
+        totalCoins = incoming.totalCoins;
+        localStorage.setItem('tiktok_total_coins', String(totalCoins));
+        document.getElementById('totalCoinsInput').value = totalCoins;
+      }
+      persistGridConfig();
+      hydrateGridInputs();
+      ensureGridCapacity();
+      updateStyleButtons();
+    }
+
+    function persistState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function sanitizeRoom(raw) {
+      return String(raw || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    }
+
+
+
+    function syncState() {
+      state.gridRows = gridRows;
+      state.gridCols = gridCols;
+      const payload = { type: 'claim-state-update', source: CLIENT_ID, state: { ...state, displayMode, totalCoins, coinSettings } };
+      if (ws && ws.readyState === 1) ws.send(JSON.stringify(payload));
+      persistState();
+      saveGridStateToServer();
+    }
+
+    const canvas = document.getElementById('fireworksLayer');
+    const ctx = canvas.getContext('2d');
+    const particles = [];
+    let rafId = null;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    function updateLiveStatus(message) {
+      const node = document.getElementById('liveStatus');
+      if (node) node.textContent = message;
+    }
+
+    function gridStateKey() {
+      return `${roomId}-grid-state`;
+    }
+
+    function layoutKey() {
+      return `${roomId}-mode2-layout`;
+    }
+
+    function collectLayoutInputs() {
+      roomLayout.fireworkWidth = Number(document.getElementById('fireworkWidth').value || defaultLayout.fireworkWidth);
+      roomLayout.fireworkHeight = Number(document.getElementById('fireworkHeight').value || defaultLayout.fireworkHeight);
+      roomLayout.fireworkOffsetX = Number(document.getElementById('fireworkOffsetX').value || defaultLayout.fireworkOffsetX);
+      roomLayout.fireworkOffsetY = Number(document.getElementById('fireworkOffsetY').value || defaultLayout.fireworkOffsetY);
+    }
+
+    function hydrateLayoutInputs() {
+      document.getElementById('fireworkWidth').value = roomLayout.fireworkWidth;
+      document.getElementById('fireworkHeight').value = roomLayout.fireworkHeight;
+      document.getElementById('fireworkOffsetX').value = roomLayout.fireworkOffsetX;
+      document.getElementById('fireworkOffsetY').value = roomLayout.fireworkOffsetY;
+    }
+
+    async function loadLayoutFromServer() {
+      try {
+        const response = await fetch(`/api/layout?key=${encodeURIComponent(layoutKey())}`, { credentials: 'include' });
+        const data = await response.json();
+        if (data.ok && data.style && typeof data.style === 'object') {
+          roomLayout = {
+            fireworkWidth: Number(data.style.fireworkWidth ?? defaultLayout.fireworkWidth),
+            fireworkHeight: Number(data.style.fireworkHeight ?? defaultLayout.fireworkHeight),
+            fireworkOffsetX: Number(data.style.fireworkOffsetX ?? defaultLayout.fireworkOffsetX),
+            fireworkOffsetY: Number(data.style.fireworkOffsetY ?? defaultLayout.fireworkOffsetY),
+          };
+        }
+      } catch {
+        roomLayout = { ...defaultLayout };
+      }
+      hydrateLayoutInputs();
+    }
+
+    async function saveGridStateToServer() {
+      const gridState = {
+        gridRows,
+        gridCols,
+        prizes: state.prizes,
+        participants: state.participants,
+        seatMap: state.seatMap,
+        displayMode,
+        totalCoins,
+        coinSettings,
+      };
+      try {
+        await fetch('/api/layout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ key: gridStateKey(), style: gridState }),
+        });
+      } catch { /* ignore */ }
+    }
+
+    async function saveLayoutToServer() {
+      collectLayoutInputs();
+      await fetch('/api/layout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ key: layoutKey(), style: roomLayout }),
+      });
+      await saveGridStateToServer();
+      updateLiveStatus('Layout saved.');
+    }
+
+    async function resetLayoutToDefaults() {
+      roomLayout = { ...defaultLayout };
+      hydrateLayoutInputs();
+      await saveLayoutToServer();
+      updateLiveStatus('Layout reset to defaults.');
+    }
+
+    function triggerFireworkBurst() {
+      collectLayoutInputs();
+      const centerX = window.innerWidth / 2 + roomLayout.fireworkOffsetX;
+      const centerY = window.innerHeight / 2 - roomLayout.fireworkOffsetY;
+
+      for (let i = 0; i < 64; i += 1) {
+        const angle = (Math.PI * 2 * i) / 64;
+        const speed = 2 + Math.random() * 5;
+        particles.push({
+          x: centerX,
+          y: centerY,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 58 + Math.random() * 16,
+          size: 2 + Math.random() * 4,
+          hue: 120 + Math.random() * 120,
+        });
+      }
+
+      if (!rafId) animateFireworks();
+    }
+
+    function animateFireworks() {
+      rafId = requestAnimationFrame(animateFireworks);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = particles.length - 1; i >= 0; i -= 1) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.035;
+        p.life -= 1;
+
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+
+        const alpha = Math.max(0, p.life / 70);
+        ctx.beginPath();
+        ctx.fillStyle = `hsla(${p.hue}, 95%, 62%, ${alpha})`;
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      if (particles.length === 0) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    }
+
+    async function refreshLiveStatus() {
+      try {
+        const response = await fetch('/api/tiktok-live/status', { credentials: 'include' });
+        const data = await response.json();
+        if (response.ok && data.connected && data.liveUniqueId) {
+          updateLiveStatus(`Live connected: @${data.liveUniqueId}`);
+          document.getElementById('liveIdInput').value = data.liveUniqueId;
+          return;
+        }
+        updateLiveStatus('Live bridge idle.');
+      } catch {
+        updateLiveStatus('Live status unavailable.');
+      }
+    }
+
+    async function connectLiveBridge() {
+      const raw = document.getElementById('liveIdInput').value;
+      const liveUniqueId = String(raw || '').trim().replace(/^@+/, '');
+      if (!liveUniqueId) {
+        updateLiveStatus('Please enter live id first.');
+        return;
+      }
+
+      updateLiveStatus('Connecting live bridge...');
+      try {
+        const response = await fetch('/api/tiktok-live/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ liveUniqueId }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          updateLiveStatus(data.error || 'Failed to connect live bridge.');
+          return;
+        }
+        updateLiveStatus(`Live connected: @${data.liveUniqueId}`);
+      } catch {
+        updateLiveStatus('Network error while connecting live bridge.');
+      }
+    }
+
+    async function stopLiveBridge() {
+      updateLiveStatus('Stopping live bridge...');
+      try {
+        const response = await fetch('/api/tiktok-live/stop', {
+          method: 'POST',
+          credentials: 'include',
+        });
+        if (!response.ok) {
+          updateLiveStatus('Failed to stop live bridge.');
+          return;
+        }
+        updateLiveStatus('Live bridge stopped.');
+      } catch {
+        updateLiveStatus('Network error while stopping live bridge.');
+      }
+    }
+
+    function connectSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      ws = new WebSocket(`${protocol}://${window.location.host}/ws?room=${encodeURIComponent(roomId)}&client=mode2`);
+      ws.onopen = () => {
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
+        syncState();
+      };
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (!msg || msg.source === CLIENT_ID) return;
+
+          if (msg.type === 'claim-state-update') {
+            mergeState(msg.state);
+            persistState();
+            render();
+            return;
+          }
+
+          if (msg.type === 'tiktok-live-gift') {
+            updateLiveStatus(`Live gift: ${msg?.gift?.name || 'Gift'}`);
+            triggerFireworkBurst();
+            return;
+          }
+
+          if (msg.type === 'tiktok-live-status') {
+            updateLiveStatus(msg.connected ? `Live connected: @${msg.liveUniqueId}` : 'Live disconnected');
+            return;
+          }
+
+          if (msg.type === 'tiktok-live-error') {
+            updateLiveStatus(`Live error: ${msg.message || 'Unknown error'}`);
+          }
+        } catch {
+          // ignore malformed payload
+        }
+      };
+      ws.onclose = (event) => {
+        if (event && (event.code === 4401 || event.code === 4403 || event.code === 4409)) {
+          window.location.href = 'portal.html';
+          return;
+        }
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(() => {
+          connectSocket();
+        }, 1500);
+      };
+    }
+
+    async function requireAuth() {
+      try {
+        const response = await fetch('/api/auth/status', { credentials: 'include' });
+        const data = await response.json();
+        if (!response.ok || !data.authenticated || !data.user) {
+          window.location.href = 'portal.html';
+          return false;
+        }
+        roomId = sanitizeRoom(data.user.username) || 'public';
+        loadGridConfig();
+        connectSocket();
+        await loadLayoutFromServer();
+        ensureGridCapacity();
+        hydrateGridInputs();
+        await refreshLiveStatus();
+        return true;
+      } catch {
+        window.location.href = 'portal.html';
+        return false;
+      }
+    }
+
+    async function checkAuthAlive() {
+      try {
+        const response = await fetch('/api/auth/status', { credentials: 'include' });
+        const data = await response.json();
+        if (!response.ok || !data.authenticated) {
+          if (authWatchTimer) {
+            clearInterval(authWatchTimer);
+            authWatchTimer = null;
+          }
+          try { if (ws) ws.close(); } catch {}
+          window.location.href = 'portal.html';
+        }
+      } catch {
+        // keep current page state on transient network errors
+      }
+    }
+
+    function startAuthWatcher() {
+      if (authWatchTimer) clearInterval(authWatchTimer);
+      authWatchTimer = setInterval(checkAuthAlive, 10000);
+    }
+
+    function findProfile(id) {
+      return state.participants.find((p) => p.id === id) || null;
+    }
+
+    function updatePrize(seatIndex, value) {
+      const amount = Number(value);
+      state.prizes[seatIndex] = Number.isFinite(amount) && amount >= 0 ? Math.floor(amount) : 0;
+      syncState();
+    }
+
+    function randomSeatIndex() {
+      const seatCount = getGridSeatCount();
+      if (window.crypto && window.crypto.getRandomValues) {
+        const arr = new Uint32Array(1);
+        window.crypto.getRandomValues(arr);
+        return arr[0] % seatCount;
+      }
+      return Math.floor(Math.random() * seatCount);
+    }
+
+    function spinWinner() {
+      const seatIndex = randomSeatIndex();
+      const profile = findProfile(state.seatMap[seatIndex]);
+      const amount = Number(state.prizes[seatIndex] || 0);
+
+      state.winner = {
+        seatIndex,
+        profileId: state.seatMap[seatIndex],
+        name: profile ? profile.name : '',
+        amount,
+        ts: Date.now(),
+      };
+      syncState();
+      render();
+      triggerFireworkBurst();
+    }
+
+    function clearWinner() {
+      state.winner = null;
+      syncState();
+      render();
+    }
+
+    function renderBoard() {
+      const board = document.getElementById('winnerBoard');
+      if (!state.winner) {
+        board.innerHTML = 'No winner yet.';
+        return;
+      }
+      board.innerHTML = `<strong>Winner:</strong> Grid ${state.winner.seatIndex + 1} ${state.winner.name ? `(${escapeHtml(state.winner.name)})` : ''}<br><strong>Prize:</strong> ${COIN_SVG} ${isCustomSeat(state.winner.seatIndex) ? (window.I18N ? I18N.t('custom') : 'Custom') : state.winner.amount}`;
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      grid.style.gridTemplateColumns = `repeat(${gridCols}, minmax(0, 1fr))`;
+
+      const seatCount = getGridSeatCount();
+
+      for (let i = 0; i < seatCount; i += 1) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        if (state.winner && state.winner.seatIndex === i) {
+          cell.classList.add('win');
+        }
+
+        const label = document.createElement('span');
+        label.className = 'grid-label';
+        label.textContent = `${i + 1}`;
+
+        const coinRow = document.createElement('div');
+        coinRow.className = 'coin-row';
+        coinRow.innerHTML = COIN_SVG;
+
+        if (isCustomSeat(i)) {
+          const custom = document.createElement('strong');
+          custom.textContent = window.I18N ? I18N.t('custom') : 'Custom';
+          coinRow.appendChild(custom);
+          cell.appendChild(label);
+          cell.appendChild(coinRow);
+          grid.appendChild(cell);
+          continue;
+        }
+
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.className = 'coin-input';
+        input.min = '0';
+        input.step = '1';
+        input.value = Number(state.prizes[i] || 0);
+        input.setAttribute('aria-label', `Coins for grid ${i + 1}`);
+        input.addEventListener('change', () => updatePrize(i, input.value));
+        input.addEventListener('blur', () => updatePrize(i, input.value));
+
+        coinRow.appendChild(input);
+        cell.appendChild(label);
+        cell.appendChild(coinRow);
+        grid.appendChild(cell);
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function render() {
+      renderGrid();
+      renderBoard();
+    }
+
+    function updateStyleButtons() {
+      const m1 = document.getElementById('styleMode1Btn');
+      const m2 = document.getElementById('styleMode2Btn');
+      if (displayMode === 'mode-2') {
+        m1.classList.remove('primary');
+        m2.classList.add('primary');
+      } else {
+        m1.classList.add('primary');
+        m2.classList.remove('primary');
+      }
+    }
+
+    function setDisplayMode(mode) {
+      displayMode = mode;
+      localStorage.setItem('tiktok_display_mode', mode);
+      updateStyleButtons();
+      syncState();
+    }
+
+    function setTotalCoins(val) {
+      totalCoins = Math.max(0, Math.floor(Number(val) || 0));
+      localStorage.setItem('tiktok_total_coins', String(totalCoins));
+      syncState();
+    }
+
+    function bindEvents() {
+      document.getElementById('spinBtn').addEventListener('click', spinWinner);
+      document.getElementById('clearWinnerBtn').addEventListener('click', clearWinner);
+      document.getElementById('connectLiveBtn').addEventListener('click', connectLiveBridge);
+      document.getElementById('stopLiveBtn').addEventListener('click', stopLiveBridge);
+      document.getElementById('saveLayoutBtn').addEventListener('click', saveLayoutToServer);
+      document.getElementById('resetLayoutBtn').addEventListener('click', resetLayoutToDefaults);
+      document.getElementById('applyGridBtn').addEventListener('click', applyGridSizeFromInputs);
+
+      document.getElementById('styleMode1Btn').addEventListener('click', () => setDisplayMode('mode-1'));
+      document.getElementById('styleMode2Btn').addEventListener('click', () => setDisplayMode('mode-2'));
+      document.getElementById('totalCoinsInput').addEventListener('change', (e) => setTotalCoins(e.target.value));
+      document.getElementById('totalCoinsInput').addEventListener('blur', (e) => setTotalCoins(e.target.value));
+
+      // Coin & currency settings (pushed to Mode 1)
+      let coinSaveTimer = null;
+      function persistCoinSettings() {
+        try { localStorage.setItem('tiktok_coin_settings', JSON.stringify(coinSettings)); } catch { /* ignore */ }
+        clearTimeout(coinSaveTimer);
+        coinSaveTimer = setTimeout(() => syncState(), 300); // broadcast (WS) + persist + save
+      }
+      (function hydrateCoinSettings() {
+        document.getElementById('coinRateInput').value = coinSettings.rate;
+        document.getElementById('coinSymbolInput').value = coinSettings.symbol;
+        document.getElementById('showCoinInput').checked = coinSettings.showCoin !== false;
+        document.getElementById('coinSizeInput').value = coinSettings.coinSize;
+        document.getElementById('coinSizeVal').textContent = coinSettings.coinSize;
+        document.getElementById('headerUnitInput').value = coinSettings.headerUnit === 'currency' ? 'currency' : 'coin';
+      })();
+      document.getElementById('headerUnitInput').addEventListener('change', (e) => {
+        coinSettings.headerUnit = e.target.value === 'currency' ? 'currency' : 'coin';
+        persistCoinSettings();
+      });
+      document.getElementById('coinRateInput').addEventListener('input', (e) => {
+        const v = Number(e.target.value);
+        coinSettings.rate = (Number.isFinite(v) && v >= 0) ? v : coinSettings.rate;
+        persistCoinSettings();
+      });
+      document.getElementById('coinSymbolInput').addEventListener('input', (e) => {
+        coinSettings.symbol = e.target.value;
+        persistCoinSettings();
+      });
+      document.getElementById('showCoinInput').addEventListener('change', (e) => {
+        coinSettings.showCoin = e.target.checked;
+        persistCoinSettings();
+      });
+      document.getElementById('coinSizeInput').addEventListener('input', (e) => {
+        const v = parseInt(e.target.value, 10);
+        coinSettings.coinSize = (Number.isFinite(v) && v > 0) ? v : coinSettings.coinSize;
+        document.getElementById('coinSizeVal').textContent = coinSettings.coinSize;
+        persistCoinSettings();
+      });
+
+      const layoutEditor = document.getElementById('layoutEditor');
+      document.getElementById('toggleLayoutBtn').addEventListener('click', () => {
+        layoutEditor.classList.toggle('open');
+      });
+
+      ['gridRows', 'gridCols', 'fireworkWidth', 'fireworkHeight', 'fireworkOffsetX', 'fireworkOffsetY'].forEach((id) => {
+        document.getElementById(id).addEventListener('input', collectLayoutInputs);
+      });
+
+      window.addEventListener('resize', resizeCanvas);
+      window.addEventListener('languageChanged', render);
+
+      window.addEventListener('storage', (event) => {
+        if (event.key !== STORAGE_KEY || !event.newValue) return;
+        try {
+          mergeState(JSON.parse(event.newValue));
+          render();
+        } catch {
+          // ignore
+        }
+      });
+    }
+
+    (async function init() {
+      const ok = await requireAuth();
+      if (!ok) return;
+      resizeCanvas();
+      document.getElementById('totalCoinsInput').value = totalCoins;
+      updateStyleButtons();
+      bindEvents();
+      startAuthWatcher();
+      render();
+    })();
+
+    window.addEventListener('beforeunload', () => {
+      if (authWatchTimer) clearInterval(authWatchTimer);
+    });
+  </script>
+  <script src="i18n.js"></script>
+</body>
+</html>
