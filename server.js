@@ -61,7 +61,9 @@ async function api(req, res, url) {
     const cached = profileCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) return send(res, 200, { data: cached.profile });
     try {
-      const response = await fetch('https://www.tikwm.com/api/user/info/', {
+      // TikWM documents this endpoint without a trailing slash. Keeping the
+      // canonical path avoids redirects that can change the POST to a GET.
+      const response = await fetch('https://www.tikwm.com/api/user/info', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -75,7 +77,7 @@ async function api(req, res, url) {
       const result = await response.json();
       const user = result?.data?.user || result?.user || null;
       if (result?.code !== 0 || !user) return send(res, 404, { error: 'TikTok profile not found.' });
-      const stats = user.stats || user;
+      const stats = result?.data?.stats || user.stats || user;
       const profile = {
         username: user.uniqueId || user.unique_id || username,
         nickname: user.nickname || user.displayName || user.display_name || user.uniqueId || username,
